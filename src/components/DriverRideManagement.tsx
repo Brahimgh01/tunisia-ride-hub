@@ -1,0 +1,519 @@
+import { useEffect, useState, useRef } from 'react';
+import { Rating } from './Rating';
+
+// Helper to show browser notification
+function showNotification(title: string, options?: NotificationOptions) {
+  if (window.Notification && Notification.permission === 'granted') {
+    new Notification(title, options);
+  }
+}
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { MapPin, CheckCircle, Navigation, Car, Calendar, CreditCard, Star } from 'lucide-react';
+import RideChat from './RideChat';
+import { Ride, RideRating } from '@/lib/types';
+
+interface DriverRating {
+  average: number;
+  count: number;
+}
+
+interface DriverRideManagementProps {
+  language: string;
+}
+
+const translations = {
+  en: {
+    pending: 'Pending Requests',
+    active: 'Active Ride',
+    noRides: 'No pending rides',
+    accept: 'Accept',
+    reject: 'Reject',
+    enRoute: 'En Route',
+    arrived: 'Arrived',
+    startRide: 'Start Ride',
+    complete: 'Complete Ride',
+    from: 'From',
+    to: 'To',
+    rideType: 'Type',
+    paymentMethod: 'Payment',
+    scheduled: 'Scheduled',
+    notes: 'Notes',
+    rideHistory: 'Ride History',
+    yourRating: 'Your Rating',
+    noCompletedRides: 'No completed rides yet.',
+    rideTypes: {
+      taxi: 'Taxi',
+      premium: 'Premium',
+      carpooling: 'Carpooling',
+      motorcycle: 'Motorcycle',
+    },
+    paymentMethods: {
+      cash: 'Cash',
+      konnect: 'Konnect',
+      edinar: 'E-Dinar',
+      card: 'Card',
+    }
+  },
+  ar: {
+    pending: 'الطلبات المعلقة',
+    active: 'الرحلة النشطة',
+    noRides: 'لا توجد رحلات معلقة',
+    accept: 'قبول',
+    reject: 'رفض',
+    enRoute: 'في الطريق',
+    arrived: 'وصلت',
+    startRide: 'بدء الرحلة',
+    complete: 'إنهاء الرحلة',
+    from: 'من',
+    to: 'إلى',
+    rideType: 'النوع',
+    paymentMethod: 'الدفع',
+    scheduled: 'مجدولة',
+    notes: 'ملاحظات',
+    rideHistory: 'سجل الرحلات',
+    yourRating: 'تقييمك',
+    noCompletedRides: 'لا توجد رحلات مكتملة بعد.',
+    rideTypes: {
+      taxi: 'تاكسي',
+      premium: 'بريميوم',
+      carpooling: 'مشاركة',
+      motorcycle: 'دراجة نارية',
+    },
+    paymentMethods: {
+      cash: 'نقداً',
+      konnect: 'كونكت',
+      edinar: 'إي-دينار',
+      card: 'بطاقة',
+    }
+  },
+  fr: {
+    pending: 'Demandes en attente',
+    active: 'Course active',
+    noRides: 'Aucune course en attente',
+    accept: 'Accepter',
+    reject: 'Refuser',
+    enRoute: 'En route',
+    arrived: 'Arrivé',
+    startRide: 'Démarrer',
+    complete: 'Terminer',
+    from: 'De',
+    to: 'À',
+    rideType: 'Type',
+    paymentMethod: 'Paiement',
+    scheduled: 'Prévu',
+    notes: 'Notes',
+    rideHistory: 'Historique des courses',
+    yourRating: 'Votre évaluation',
+    noCompletedRides: 'Aucune course terminée pour le moment.',
+    rideTypes: {
+      taxi: 'Taxi',
+      premium: 'Premium',
+      carpooling: 'Covoiturage',
+      motorcycle: 'Moto',
+    },
+    paymentMethods: {
+      cash: 'Espèces',
+      konnect: 'Konnect',
+      edinar: 'E-Dinar',
+      card: 'Carte',
+    }
+  }
+};
+
+const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
+  // Ask for notification permission on mount
+  useEffect(() => {
+    if (window.Notification && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+  const { user } = useAuth();
+  const [pendingRides, setPendingRides] = useState<Ride[]>([]);
+  const [activeRide, setActiveRide] = useState<Ride | null>(null);
+  const [completedRides, setCompletedRides] = useState<Ride[]>([]);
+  const [driverRating, setDriverRating] = useState<DriverRating | null>(null);
+  const [loading, setLoading] = useState(true);
+  const t = translations[language as keyof typeof translations] || translations.en;
+
+
+  // Accept a pending ride
+  // Accept a pending ride
+  const acceptRide = async (rideId: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('rides')
+      .update({ status: 'accepted', driver_id: user.id })
+      .eq('id', rideId);
+    if (error) {
+      toast.error('Failed to accept ride');
+    } else {
+      toast.success('Ride accepted');
+      fetchRides();
+    }
+  };
+
+  // Update ride status for active ride
+  const updateRideStatus = async (status: string) => {
+    if (!user || !activeRide) return;
+    const { error } = await supabase
+      .from('rides')
+      .update({ status })
+      .eq('id', activeRide.id);
+    if (error) {
+      toast.error('Failed to update ride status');
+    } else {
+      toast.success('Status updated');
+      fetchRides();
+    }
+  };
+
+  const fetchDriverRating = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('ride_ratings')
+      .select('rating')
+      .eq('driver_id', user.id);
+
+    if (error) {
+      console.error('Error fetching driver rating:', error);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      const totalRating = data.reduce((acc, rating) => acc + rating.rating, 0);
+      const average = totalRating / data.length;
+      setDriverRating({ average, count: data.length });
+    }
+  };
+
+  const fetchCompletedRides = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+        .from('rides')
+        .select(`
+            *,
+            ride_ratings ( rating, comment )
+        `)
+        .eq('status', 'completed')
+        .eq('driver_id', user.id)
+        .order('created_at', { ascending: false });
+
+    if (!error) {
+        setCompletedRides(data as unknown as Ride[] || []);
+    }
+  }
+
+  // Fetch rides (pending and active)
+  const fetchRides = async () => {
+    if (!user) return;
+    setLoading(true);
+    // Pending rides
+    const { data: pending, error: pendingError } = await supabase
+      .from('rides')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+    // Active ride (accepted or in progress for this driver)
+    const { data: active, error: activeError } = await supabase
+      .from('rides')
+      .select('*')
+      .in('status', ['accepted', 'driver_en_route', 'driver_arrived', 'in_progress'])
+      .eq('driver_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (!pendingError) setPendingRides(pending as unknown as Ride[] || []);
+    if (!activeError && active && active.length > 0) setActiveRide(active[0] as unknown as Ride | null);
+    else setActiveRide(null);
+    fetchCompletedRides();
+    fetchDriverRating();
+    setLoading(false);
+  };
+
+  // Track previous ride status for notification
+  const prevStatusRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    // Request notification permission
+    if (window.Notification && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    
+    fetchRides();
+
+    // Subscribe to real-time ride updates for this driver
+    const channel = supabase
+      .channel('driver-ride-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rides',
+          filter: `driver_id=eq.${user.id}`
+        },
+        (payload) => {
+          const ride = payload.new as Ride;
+          if (ride && ride.status && prevStatusRef.current !== ride.status) {
+            showNotification('Ride Status Updated', { 
+              body: `Status: ${ride.status}`,
+              icon: '/favicon.ico'
+            });
+            prevStatusRef.current = ride.status;
+          }
+          fetchRides();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'rides',
+          filter: `status=eq.pending`
+        },
+        (payload) => {
+          const ride = payload.new as Ride;
+          showNotification('🚗 New Ride Request!', { 
+            body: `From: ${ride.pickup_location}`,
+            icon: '/favicon.ico',
+            requireInteraction: true
+          });
+          toast.info('New ride request available!');
+          fetchRides();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to chat messages for active ride
+    let chatChannel: any = null;
+    if (activeRide?.id) {
+      chatChannel = supabase
+        .channel('ride-chat-' + activeRide.id)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'ride_chat_messages', filter: `ride_id=eq.${activeRide.id}` },
+          (payload) => {
+            const msg = payload.new;
+            if (msg && msg.sender_id !== user.id) {
+              showNotification('New chat message', { body: msg.message });
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (chatChannel) supabase.removeChannel(chatChannel);
+    };
+    // eslint-disable-next-line
+  }, [user, activeRide?.id]);
+
+  if (loading) {
+    return <div className="p-6">Loading...</div>;
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      {driverRating && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t.yourRating}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Star className="h-6 w-6 text-yellow-400" fill="currentColor" />
+              <span className="text-2xl font-bold">{driverRating.average.toFixed(1)}</span>
+              <span className="text-muted-foreground">({driverRating.count} ratings)</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeRide && (
+        <Card className="border-primary">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Car className="h-5 w-5" />
+              {t.active}
+              <Badge>{activeRide.status}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-green-500" />
+                <span>{t.from}: {activeRide.pickup_location}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-red-500" />
+                <span>{t.to}: {activeRide.dropoff_location}</span>
+              </div>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground pt-2">
+                {activeRide.ride_type && (
+                  <div className="flex items-center gap-1">
+                    <Car className="h-4 w-4" />
+                    <span>{t.rideTypes[activeRide.ride_type as keyof typeof t.rideTypes]}</span>
+                  </div>
+                )}
+                {activeRide.payment_method && (
+                  <div className="flex items-center gap-1">
+                    <CreditCard className="h-4 w-4" />
+                    <span>{t.paymentMethods[activeRide.payment_method as keyof typeof t.paymentMethods]}</span>
+                  </div>
+                )}
+              </div>
+              {activeRide.is_scheduled && activeRide.scheduled_time && (
+                <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                  <Calendar className="h-4 w-4" />
+                  <span>{t.scheduled}: {new Date(activeRide.scheduled_time).toLocaleString()}</span>
+                </div>
+              )}
+              {activeRide.customer_notes && (
+                <div className="p-3 bg-muted rounded-lg text-sm">
+                  <strong>{t.notes}:</strong> {activeRide.customer_notes}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {activeRide.status === 'accepted' && (
+                <Button onClick={() => updateRideStatus('driver_en_route')} className="flex-1">
+                  <Navigation className="h-4 w-4 mr-2" />
+                  {t.enRoute}
+                </Button>
+              )}
+              {activeRide.status === 'driver_en_route' && (
+                <Button onClick={() => updateRideStatus('driver_arrived')} className="flex-1">
+                  {t.arrived}
+                </Button>
+              )}
+              {activeRide.status === 'driver_arrived' && (
+                <Button onClick={() => updateRideStatus('in_progress')} className="flex-1">
+                  {t.startRide}
+                </Button>
+              )}
+              {activeRide.status === 'in_progress' && (
+                <Button onClick={() => updateRideStatus('completed')} className="flex-1">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  {t.complete}
+                </Button>
+              )}
+            </div>
+            {/* Modern Chat UI */}
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-2">Chat with Customer</h3>
+              <RideChat rideId={activeRide.id} userRole="driver" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div>
+        <h2 className="text-2xl font-bold mb-4">{t.pending}</h2>
+        {pendingRides.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6 text-center text-muted-foreground">
+              {t.noRides}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {pendingRides.map((ride) => (
+              <Card key={ride.id}>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-green-500" />
+                      <span>{t.from}: {ride.pickup_location}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-red-500" />
+                      <span>{t.to}: {ride.dropoff_location}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground pt-2">
+                      {ride.ride_type && (
+                        <div className="flex items-center gap-1">
+                          <Car className="h-4 w-4" />
+                          <span>{t.rideTypes[ride.ride_type as keyof typeof t.rideTypes]}</span>
+                        </div>
+                      )}
+                      {ride.payment_method && (
+                        <div className="flex items-center gap-1">
+                          <CreditCard className="h-4 w-4" />
+                          <span>{t.paymentMethods[ride.payment_method as keyof typeof t.paymentMethods]}</span>
+                        </div>
+                      )}
+                    </div>
+                    {ride.is_scheduled && ride.scheduled_time && (
+                      <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                        <Calendar className="h-4 w-4" />
+                        <span>{t.scheduled}: {new Date(ride.scheduled_time).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {ride.customer_notes && (
+                      <div className="p-3 bg-muted rounded-lg text-sm">
+                        <strong>{t.notes}:</strong> {ride.customer_notes}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => acceptRide(ride.id)} className="flex-1">
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      {t.accept}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold mb-4">{t.rideHistory}</h2>
+        {completedRides.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6 text-center text-muted-foreground">
+              {t.noCompletedRides}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {completedRides.map((ride) => (
+              <Card key={ride.id}>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-green-500" />
+                      <span>{t.from}: {ride.pickup_location}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-red-500" />
+                      <span>{t.to}: {ride.dropoff_location}</span>
+                    </div>
+                  </div>
+                  {ride.ride_ratings && ride.ride_ratings.length > 0 && (
+                    <div className="flex items-center gap-2">
+                        <Rating value={ride.ride_ratings[0].rating} isReadOnly={true} onChange={() => {}} />
+                        <p>{ride.ride_ratings[0].comment}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default DriverRideManagement;
