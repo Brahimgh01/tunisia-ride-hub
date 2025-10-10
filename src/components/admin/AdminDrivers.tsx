@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 
 interface Driver {
-  id: string;
+  user_id: string;
   full_name: string;
   phone: string;
   city: string;
@@ -38,7 +38,7 @@ export function AdminDrivers() {
     // Get profiles for these users
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, user_id, full_name, phone, city')
+      .select('user_id, full_name, phone, city')
       .in('user_id', driverUserIds);
 
     if (profiles) {
@@ -75,7 +75,7 @@ export function AdminDrivers() {
           </TableHeader>
           <TableBody>
             {drivers.map((driver) => (
-              <TableRow key={driver.id}>
+              <TableRow key={driver.user_id}>
                 <TableCell>{driver.full_name}</TableCell>
                 <TableCell>{driver.phone}</TableCell>
                 <TableCell>{driver.city}</TableCell>

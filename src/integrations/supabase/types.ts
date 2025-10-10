@@ -135,20 +135,13 @@ export type Database = {
           longitude?: number
           speed_kmh?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "driver_locations_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-        ]
+        Relationships: []
       }
       driver_profiles: {
         Row: {
           created_at: string | null
           driver_id: string
+          driver_preferences: Json | null
           id_document_back_url: string | null
           id_document_front_url: string | null
           id_document_verification_status: string | null
@@ -169,6 +162,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           driver_id: string
+          driver_preferences?: Json | null
           id_document_back_url?: string | null
           id_document_front_url?: string | null
           id_document_verification_status?: string | null
@@ -189,6 +183,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           driver_id?: string
+          driver_preferences?: Json | null
           id_document_back_url?: string | null
           id_document_front_url?: string | null
           id_document_verification_status?: string | null
@@ -272,15 +267,7 @@ export type Database = {
           vehicle_model?: string | null
           vehicle_type?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "driver_subscriptions_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-        ]
+        Relationships: []
       }
       favorite_locations: {
         Row: {
@@ -342,35 +329,76 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          ride_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          ride_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          ride_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_ride_id_fkey"
+            columns: ["ride_id"]
+            isOneToOne: false
+            referencedRelation: "rides"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           city: string | null
-          created_at: string
+          created_at: string | null
           full_name: string
-          id: string
+          is_admin: boolean | null
           phone: string | null
           referral_code: string | null
-          updated_at: string
+          updated_at: string | null
           user_id: string
         }
         Insert: {
           city?: string | null
-          created_at?: string
+          created_at?: string | null
           full_name: string
-          id?: string
+          is_admin?: boolean | null
           phone?: string | null
           referral_code?: string | null
-          updated_at?: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
           city?: string | null
-          created_at?: string
+          created_at?: string | null
           full_name?: string
-          id?: string
+          is_admin?: boolean | null
           phone?: string | null
           referral_code?: string | null
-          updated_at?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -708,20 +736,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "rides_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "rides_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-          {
             foreignKeyName: "rides_promo_code_id_fkey"
             columns: ["promo_code_id"]
             isOneToOne: false
@@ -845,31 +859,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
         }
-        Insert: {
-          driver_id?: string | null
-          id?: string | null
-          is_available?: boolean | null
-          last_updated?: string | null
-          latitude?: never
-          longitude?: never
-        }
-        Update: {
-          driver_id?: string | null
-          id?: string | null
-          is_available?: boolean | null
-          last_updated?: string | null
-          latitude?: never
-          longitude?: never
-        }
-        Relationships: [
-          {
-            foreignKeyName: "driver_locations_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Functions: {

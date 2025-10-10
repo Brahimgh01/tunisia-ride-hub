@@ -1,6 +1,5 @@
 
 export interface Profile {
-  id: string;
   user_id: string;
   full_name: string;
   avatar_url?: string;
@@ -8,9 +7,10 @@ export interface Profile {
   city?: string;
   is_admin?: boolean;
   referral_code?: string;
-  role?: string;
+  created_at?: string;
+  updated_at?: string;
   
-  // Driver-specific fields
+  // Driver-specific fields (from driver_profiles join)
   vehicle_type?: string;
   vehicle_model?: string;
   vehicle_color?: string;

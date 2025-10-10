@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 
 interface User {
-  id: string;
+  user_id: string;
   full_name: string;
   phone: string;
   city: string;
@@ -22,7 +22,7 @@ export function AdminUsers() {
   const fetchUsers = async () => {
     const { data } = await supabase
       .from('profiles')
-      .select('id, full_name, phone, city, created_at')
+      .select('user_id, full_name, phone, city, created_at')
       .order('created_at', { ascending: false });
 
     if (data) setUsers(data);
@@ -45,7 +45,7 @@ export function AdminUsers() {
           </TableHeader>
           <TableBody>
             {users.map((user) => (
-              <TableRow key={user.id}>
+              <TableRow key={user.user_id}>
                 <TableCell>{user.full_name}</TableCell>
                 <TableCell>{user.phone}</TableCell>
                 <TableCell>{user.city}</TableCell>

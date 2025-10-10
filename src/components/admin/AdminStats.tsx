@@ -18,9 +18,19 @@ export function AdminStats() {
   }, []);
 
   const fetchStats = async () => {
-    const [usersRes, driversRes, ridesRes, completedRes, todayRes] = await Promise.all([
-      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'customer'),
-      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'driver'),
+    // Count customers from user_roles
+    const { count: customersCount } = await supabase
+      .from('user_roles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'customer');
+    
+    // Count drivers from user_roles
+    const { count: driversCount } = await supabase
+      .from('user_roles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'driver');
+    
+    const [ridesRes, completedRes, todayRes] = await Promise.all([
       supabase.from('rides').select('id', { count: 'exact', head: true }),
       supabase.from('rides').select('final_price').eq('status', 'completed'),
       supabase.from('rides').select('id', { count: 'exact', head: true })
@@ -30,8 +40,8 @@ export function AdminStats() {
     const revenue = completedRes.data?.reduce((sum, ride) => sum + (Number(ride.final_price) || 0), 0) || 0;
 
     setStats({
-      totalUsers: usersRes.count || 0,
-      totalDrivers: driversRes.count || 0,
+      totalUsers: customersCount || 0,
+      totalDrivers: driversCount || 0,
       totalRides: ridesRes.count || 0,
       completedRides: completedRes.data?.length || 0,
       totalRevenue: revenue,

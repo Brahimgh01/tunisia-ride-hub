@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import DriverRideManagement from './DriverRideManagement';
 import DriverRegistration from './DriverRegistration';
 import DriverMapView from './DriverMapView';
+import { NotificationBell } from './NotificationBell';
 import { Profile } from '@/lib/types';
 import { MapPin, Navigation2, DollarSign, Star, Clock, CheckCircle, TrendingUp, Activity, CreditCard, Calendar } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -373,26 +374,29 @@ export default function DriverDashboard() {
             </div>
           </div>
 
-          <Card className="w-full md:w-auto">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Switch
-                  id="availability-switch"
-                  checked={isAvailable}
-                  onCheckedChange={handleAvailabilityChange}
-                  disabled={!isVerified}
-                />
-                <Label htmlFor="availability-switch" className="cursor-pointer font-medium">
-                  {t.availability}
-                </Label>
-              </div>
-              {!isVerified && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Pending verification
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <div className="flex gap-2 items-center">
+            {user && <NotificationBell userId={user.id} />}
+            <Card className="w-full md:w-auto">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="availability-switch"
+                    checked={isAvailable}
+                    onCheckedChange={handleAvailabilityChange}
+                    disabled={!isVerified}
+                  />
+                  <Label htmlFor="availability-switch" className="cursor-pointer font-medium">
+                    {t.availability}
+                  </Label>
+                </div>
+                {!isVerified && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Pending verification
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Stats Cards */}

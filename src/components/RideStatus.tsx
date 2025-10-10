@@ -10,6 +10,18 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { Rating } from './Rating';
 import RideChat from './RideChat';
+import { Phone, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface RideStatusProps {
   rideId: string;
@@ -40,7 +52,13 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
         .from('rides')
         .select(`
           *,
-          driver:driver_id (*)
+          driver:profiles!rides_driver_id_fkey (
+            full_name,
+            phone,
+            vehicle_model,
+            vehicle_color,
+            license_plate_number
+          )
         `)
         .eq('id', rideId)
         .single();
@@ -66,6 +84,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
   useEffect(() => {
     fetchRide();
 
+    // Subscribe to real-time ride updates
     const subscription = supabase
       .channel(`ride-${rideId}`)
       .on(
@@ -82,6 +101,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
   }, [rideId]);
 
   const handleCancelRide = async () => {
+    setLoading(true);
     const { error } = await supabase
       .from('rides')
       .update({ 
@@ -98,6 +118,15 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
     } else {
       toast.success("Ride has been canceled.");
       onRideComplete();
+    }
+    setLoading(false);
+  };
+
+  const handleCallDriver = () => {
+    if (ride?.driver && 'phone' in ride.driver && ride.driver.phone) {
+      window.location.href = `tel:${ride.driver.phone}`;
+    } else {
+      toast.error("Driver phone number not available");
     }
   };
 
@@ -138,7 +167,46 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
         <CardHeader>
           <CardTitle className="flex justify-between items-center">
             <span>Ride Status</span>
-            <Badge variant={ride.status === 'completed' ? 'default' : 'secondary'}>{ride.status}</Badge>
+            <div className="flex gap-2 items-center">
+              <Badge variant={ride.status === 'completed' ? 'default' : 'secondary'}>
+                {ride.status.replace('_', ' ').toUpperCase()}
+              </Badge>
+              {ride.driver && ride.status !== 'completed' && ride.status !== 'canceled' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCallDriver}
+                  className="gap-2"
+                >
+                  <Phone className="h-4 w-4" />
+                  Call Driver
+                </Button>
+              )}
+              {canCancel && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="gap-2">
+                      <X className="h-4 w-4" />
+                      Cancel
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancel Ride?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to cancel this ride? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>No, keep ride</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleCancelRide}>
+                        Yes, cancel ride
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -175,12 +243,6 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
                   <Button onClick={handleRateRide}>Submit Rating</Button>
               </CardContent>
           </Card>
-      )}
-
-      {canCancel && (
-        <Button variant="destructive" onClick={handleCancelRide} className="w-full">
-          Cancel Ride
-        </Button>
       )}
 
       {(ride.status === 'completed' || ride.status === 'rated' || ride.status === 'canceled') && (

@@ -11,6 +11,7 @@ import { FavoriteLocations } from './FavoriteLocations';
 import { LoyaltyDisplay } from './LoyaltyDisplay';
 import { ThemeToggle } from './ThemeToggle';
 import { ReferralCard } from './ReferralCard';
+import { NotificationBell } from './NotificationBell';
 import { ArrowLeft, Car, Package, History } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -145,7 +146,10 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
           <h1 className="text-2xl font-bold bg-gradient-tunisian bg-clip-text text-transparent">
             {t.dashboard}
           </h1>
-          <ThemeToggle />
+          <div className="flex gap-2 items-center">
+            {user && <NotificationBell userId={user.id} />}
+            <ThemeToggle />
+          </div>
         </div>
 
         {loadingRide ? (

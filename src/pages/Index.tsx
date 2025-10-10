@@ -14,12 +14,19 @@ const Index = () => {
       if (profile) {
         if (profile.is_admin) {
           navigate('/admin');
-        } else if (profile.role === 'driver') {
-          // User registered as driver, go to driver dashboard
-          navigate('/dashboard/driver');
         } else {
-          // Default to customer dashboard
-          navigate('/dashboard/customer');
+          // Check user_roles table to determine if driver or customer
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', profile.user_id)
+            .maybeSingle();
+          
+          if (roleData && roleData.role === 'driver') {
+            navigate('/dashboard/driver');
+          } else {
+            navigate('/dashboard/customer');
+          }
         }
       }
     };
