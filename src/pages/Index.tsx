@@ -34,8 +34,12 @@ const Index = () => {
     checkUserRole();
   }, [profile, navigate]);
 
-  if (isLoading || profile) {
+  if (isLoading) {
     return <LoadingScreen />;
+  }
+
+  if (profile) {
+    return null; // Will redirect via useEffect
   }
 
   return <AuthForm language={language} />;
