@@ -10,24 +10,16 @@ const tunisianIcons = [
 
 export function LoadingScreen() {
   const [currentIconIndex, setCurrentIconIndex] = useState(0);
-  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIconIndex((prev) => (prev + 1) % tunisianIcons.length);
     }, 800);
 
-    const timeout = setTimeout(() => {
-      setIsVisible(false);
-    }, 3200);
-
     return () => {
       clearInterval(interval);
-      clearTimeout(timeout);
     };
   }, []);
-
-  if (!isVisible) return null;
 
   const CurrentIcon = tunisianIcons[currentIconIndex].icon;
 
