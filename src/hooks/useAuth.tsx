@@ -94,8 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        // Auth state changed
+      (event, session) => {
+        // Auth state changed - only synchronous updates here
         setSession(session);
         const currentUser = session?.user ?? null;
         setUser(currentUser);
@@ -103,11 +103,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_IN' && currentUser) {
           setIsLoading(true);
-          const userProfile = await getOrCreateProfile(currentUser);
-          setProfile(userProfile);
-          setIsLoading(false);
+          // Defer Supabase calls to prevent deadlock
+          setTimeout(() => {
+            getOrCreateProfile(currentUser).then((userProfile) => {
+              setProfile(userProfile);
+              setIsLoading(false);
+            });
+          }, 0);
         } else if (event === 'SIGNED_OUT') {
-          // No need to do anything here, profile is already reset
+          setIsLoading(false);
         }
       }
     );
