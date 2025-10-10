@@ -736,6 +736,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "rides_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "rides_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "rides_promo_code_id_fkey"
             columns: ["promo_code_id"]
             isOneToOne: false
