@@ -136,107 +136,98 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
   };
 
   return (
-    <div className={`min-h-screen bg-gradient-warm p-6 ${language === 'ar' ? 'rtl' : 'ltr'}`}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <Button onClick={onBack} variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {t.back}
-          </Button>
-          <h1 className="text-2xl font-bold bg-gradient-tunisian bg-clip-text text-transparent">
-            {t.dashboard}
-          </h1>
-          <div className="flex gap-2 items-center">
-            {user && <NotificationBell userId={user.id} />}
-            <ThemeToggle />
-          </div>
+    <div className={`fixed inset-0 flex flex-col ${language === 'ar' ? 'rtl' : 'ltr'}`}>
+      {/* Mobile Header */}
+      <div className="flex items-center justify-between p-4 bg-background/95 backdrop-blur border-b z-20">
+        <Button onClick={onBack} variant="outline" size="sm">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          {t.back}
+        </Button>
+        <div className="flex gap-2 items-center">
+          {user && <NotificationBell userId={user.id} />}
+          <ThemeToggle />
         </div>
+      </div>
 
+      {/* Main Content Area */}
+      <div className="flex-1 relative overflow-hidden">
         {loadingRide ? (
-            <div className="text-center p-8">{t.loading}</div>
+          <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
+            <div className="text-center space-y-2">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground">{t.loading}</p>
+            </div>
+          </div>
         ) : error ? (
-            <div className="text-center p-8 text-red-500">{error}</div>
+          <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
+            <div className="text-center p-8 text-destructive">{error}</div>
+          </div>
         ) : activeRide ? (
-            <RideStatus rideId={activeRide.id} onRideComplete={handleRideComplete} />
+          <RideStatus rideId={activeRide.id} onRideComplete={handleRideComplete} />
         ) : (
-            <>
-                 {/* Loyalty Points Display */}
+          <>
+            {/* Full Screen Map with Booking Interface */}
+            <BookRide language={language} isMobileFullScreen={true} />
+            
+            {/* Bottom Sheet for Additional Features - Swipe up on mobile */}
+            <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-3xl shadow-2xl border-t max-h-[40vh] overflow-y-auto z-10 hidden md:block">
+              <div className="p-6 space-y-6">
+                <div className="flex items-center gap-2 text-lg font-semibold">
+                  <span>✨</span>
+                  <span>Your Benefits</span>
+                </div>
+                
+                {/* Loyalty Points */}
                 <LoyaltyDisplay language={language} />
 
                 {/* Referral Program */}
                 <ReferralCard language={language} />
 
-                <Card className="shadow-tunisian border-2">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                    {serviceMode === 'ride' ? (
-                        <>
-                        <Car className="h-5 w-5" />
-                        {t.bookRide}
-                        </>
-                    ) : (
-                        <>
-                        <Package className="h-5 w-5" />
-                        {t.bookDelivery}
-                        </>
-                    )}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Tabs value={serviceMode} onValueChange={(v) => setServiceMode(v as 'ride' | 'delivery')} className="space-y-4">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="ride" className="flex items-center gap-2">
-                        <Car className="h-4 w-4" />
-                        {t.bookRide}
-                        </TabsTrigger>
-                        <TabsTrigger value="delivery" className="flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        {t.bookDelivery}
-                        </TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="ride">
-                        <BookRide language={language} />
-                    </TabsContent>
-                    
-                    <TabsContent value="delivery">
-                        <BookDelivery language={language} userId={user.id} />
-                    </TabsContent>
-                    </Tabs>
-                </CardContent>
-                </Card>
+                {/* Favorite Locations */}
+                <FavoriteLocations language={language} />
 
+                {/* History Tabs */}
                 <Card className="shadow-tunisian border-2">
-                <CardHeader>
+                  <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                    <History className="h-5 w-5" />
-                    {t.history}
+                      <History className="h-5 w-5" />
+                      {t.history}
                     </CardTitle>
-                </CardHeader>
-                <CardContent>
+                  </CardHeader>
+                  <CardContent>
                     <Tabs value={historyMode} onValueChange={(v) => setHistoryMode(v as 'ride' | 'delivery')} className="space-y-4">
-                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="ride">{t.rides}</TabsTrigger>
                         <TabsTrigger value="delivery">{t.deliveries}</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="ride">
+                      </TabsList>
+                      
+                      <TabsContent value="ride">
                         <RideHistory language={language} />
-                    </TabsContent>
-                    
-                    <TabsContent value="delivery">
+                      </TabsContent>
+                      
+                      <TabsContent value="delivery">
                         <DeliveryHistory language={language} userId={user.id} />
-                    </TabsContent>
+                      </TabsContent>
                     </Tabs>
-                </CardContent>
+                  </CardContent>
                 </Card>
 
-                {/* Favorite Locations Management */}
-                <FavoriteLocations language={language} />
-            </>
+                {/* Delivery Service Toggle */}
+                <Card className="shadow-tunisian border-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      {t.bookDelivery}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <BookDelivery language={language} userId={user.id} />
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </>
         )}
-
-       
       </div>
     </div>
   );

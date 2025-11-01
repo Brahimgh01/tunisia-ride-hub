@@ -19,9 +19,10 @@ type FavoriteLocation = Database['public']['Tables']['favorite_locations']['Row'
 
 interface BookRideProps {
   language: string;
+  isMobileFullScreen?: boolean;
 }
 
-const BookRide = ({ language }: BookRideProps) => {
+const BookRide = ({ language, isMobileFullScreen = false }: BookRideProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [pickupLocation, setPickupLocation] = useState('');
@@ -244,6 +245,203 @@ const BookRide = ({ language }: BookRideProps) => {
     motorcycle: <Bike className="h-5 w-5" />
   };
 
+  if (isMobileFullScreen) {
+    return (
+      <div className="absolute inset-0 flex flex-col">
+        {/* Full Screen Map */}
+        <div className="flex-1">
+          <Map
+            pickupLocation={pickupCoords}
+            dropoffLocation={dropoffCoords}
+            onPickupChange={setPickupCoords}
+            onDropoffChange={setDropoffCoords}
+            onDistanceCalculated={handleDistanceCalculated}
+            height="h-full"
+            interactive={true}
+            driverLocations={driverLocations as DriverLocation[]}
+          />
+        </div>
+
+        {/* Bottom Booking Card - Slides up on mobile */}
+        <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl rounded-t-3xl shadow-2xl border-t max-h-[75vh] overflow-y-auto">
+          <div className="w-12 h-1 bg-muted rounded-full mx-auto mt-3 mb-4"></div>
+          
+          <div className="px-4 pb-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">{t.title}</h2>
+              {estimatedPrice > 0 && (
+                <div className="text-2xl font-bold text-primary">{estimatedPrice} TND</div>
+              )}
+            </div>
+
+            {/* Ride Type Selection - Horizontal Scroll */}
+            <div className="space-y-2">
+              <Label className="text-sm">{t.rideType}</Label>
+              <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
+                {(Object.keys(rideTypeIcons) as (keyof typeof rideTypeIcons)[]).map((type) => (
+                  <Button 
+                    key={type} 
+                    variant={rideType === type ? 'default' : 'outline'} 
+                    onClick={() => setRideType(type)} 
+                    className="flex-shrink-0 flex items-center gap-2"
+                  >
+                    {rideTypeIcons[type]} 
+                    <span className="text-xs">{t[type as keyof typeof t]}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Location Inputs */}
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="pickup" className="text-sm">{t.pickup}</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    id="pickup" 
+                    value={pickupLocation} 
+                    onChange={(e) => setPickupLocation(e.target.value)} 
+                    placeholder="Enter pickup" 
+                    className="flex-1"
+                  />
+                  <Button onClick={getCurrentLocation} variant="outline" size="icon">
+                    <Navigation className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dropoff" className="text-sm">{t.dropoff}</Label>
+                <Input 
+                  id="dropoff" 
+                  value={dropoffLocation} 
+                  onChange={(e) => setDropoffLocation(e.target.value)} 
+                  placeholder="Enter dropoff" 
+                />
+              </div>
+            </div>
+
+            {/* Favorites */}
+            {favorites.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm">
+                  <Heart className="h-3 w-3" />{t.favorites}
+                </Label>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {favorites.map((fav) => (
+                    <Button 
+                      key={fav.id} 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleSelectFavorite(fav, true)}
+                      className="flex-shrink-0"
+                    >
+                      {fav.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Payment Method */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm">
+                <Wallet className="h-3 w-3" />{t.paymentMethod}
+              </Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">{t.cash}</SelectItem>
+                  <SelectItem value="konnect">{t.konnect}</SelectItem>
+                  <SelectItem value="edinar">{t.edinar}</SelectItem>
+                  <SelectItem value="card">{t.card}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Schedule Option */}
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="schedule" 
+                checked={isScheduled} 
+                onCheckedChange={(checked) => setIsScheduled(checked as boolean)} 
+              />
+              <Label htmlFor="schedule" className="cursor-pointer text-sm">
+                <Calendar className="inline h-3 w-3 mr-1" />
+                {t.scheduleRide}
+              </Label>
+            </div>
+            {isScheduled && (
+              <Input 
+                type="datetime-local" 
+                value={scheduledTime} 
+                onChange={(e) => setScheduledTime(e.target.value)} 
+              />
+            )}
+
+            {/* Driver Preferences - Collapsible */}
+            <details className="group">
+              <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
+                <User className="h-3 w-3" />
+                {t.driverPreferences}
+              </summary>
+              <div className="mt-3 space-y-3 pl-5">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="femaleDriver" 
+                    checked={driverPreferences.femaleDriver} 
+                    onCheckedChange={(checked) => setDriverPreferences({ ...driverPreferences, femaleDriver: checked as boolean })} 
+                  />
+                  <Label htmlFor="femaleDriver" className="cursor-pointer text-sm">{t.femaleDriver}</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="acRequired" 
+                    checked={driverPreferences.acRequired} 
+                    onCheckedChange={(checked) => setDriverPreferences({ ...driverPreferences, acRequired: checked as boolean })} 
+                  />
+                  <Label htmlFor="acRequired" className="cursor-pointer text-sm flex items-center gap-1">
+                    <Wind className="h-3 w-3" />
+                    {t.acRequired}
+                  </Label>
+                </div>
+                <Select 
+                  value={driverPreferences.musicPreference} 
+                  onValueChange={(value) => setDriverPreferences({ ...driverPreferences, musicPreference: value })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Music Preference" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">{t.any}</SelectItem>
+                    <SelectItem value="quiet">{t.quiet}</SelectItem>
+                    <SelectItem value="music">
+                      <Music className="inline h-3 w-3 mr-1" />
+                      {t.music}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </details>
+
+            {/* Book Button */}
+            <Button 
+              onClick={handleBookRide} 
+              disabled={loading || !pickupCoords || !dropoffCoords} 
+              className="w-full bg-gradient-tunisian text-white h-12 text-lg font-semibold"
+              size="lg"
+            >
+              {loading ? 'Booking...' : t.bookRide}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop/Tablet View (Original)
   return (
     <div className="space-y-6 p-6 bg-card rounded-lg shadow-lg">
       <h2 className="text-2xl font-bold">{t.title}</h2>
