@@ -213,12 +213,16 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
   const fetchRides = async () => {
     if (!user) return;
     setLoading(true);
-    // Pending rides
+    
+    // Pending rides assigned to this driver OR unassigned nearby rides
     const { data: pending, error: pendingError } = await supabase
       .from('rides')
       .select('*')
       .eq('status', 'pending')
-      .order('created_at', { ascending: true });
+      .or(`driver_id.eq.${user.id},driver_id.is.null`)
+      .order('created_at', { ascending: true })
+      .limit(10);
+    
     // Active ride (accepted or in progress for this driver)
     const { data: active, error: activeError } = await supabase
       .from('rides')
@@ -227,9 +231,17 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
       .eq('driver_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1);
-    if (!pendingError) setPendingRides(pending as unknown as Ride[] || []);
+    
+    if (!pendingError) {
+      // Prioritize rides assigned to this driver
+      const assignedToMe = (pending as unknown as Ride[] || []).filter(r => r.driver_id === user.id);
+      const unassigned = (pending as unknown as Ride[] || []).filter(r => !r.driver_id);
+      setPendingRides([...assignedToMe, ...unassigned]);
+    }
+    
     if (!activeError && active && active.length > 0) setActiveRide(active[0] as unknown as Ride | null);
     else setActiveRide(null);
+    
     fetchCompletedRides();
     fetchDriverRating();
     setLoading(false);
@@ -248,9 +260,10 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
     
     fetchRides();
 
-    // Subscribe to real-time ride updates for this driver
+    // Subscribe to real-time ride updates
     const channel = supabase
       .channel('driver-ride-changes')
+      // Listen for rides assigned to this driver
       .on(
         'postgres_changes',
         {
@@ -261,6 +274,20 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
         },
         (payload) => {
           const ride = payload.new as Ride;
+          
+          // Show notification for ride assigned to this driver
+          if (payload.eventType === 'UPDATE' && ride.driver_id === user.id) {
+            showNotification('🎯 Ride Assigned to You!', { 
+              body: `New ride from ${ride.pickup_location}`,
+              icon: '/favicon.ico',
+              requireInteraction: true
+            });
+            toast.success('New ride assigned to you!', {
+              description: 'Check your pending requests',
+              duration: 5000
+            });
+          }
+          
           if (ride && ride.status && prevStatusRef.current !== ride.status) {
             showNotification('Ride Status Updated', { 
               body: `Status: ${ride.status}`,
@@ -271,6 +298,7 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
           fetchRides();
         }
       )
+      // Listen for ALL new pending rides (general pool)
       .on(
         'postgres_changes',
         {
@@ -281,12 +309,12 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
         },
         (payload) => {
           const ride = payload.new as Ride;
-          showNotification('🚗 New Ride Request!', { 
+          showNotification('🚗 New Ride Request Available!', { 
             body: `From: ${ride.pickup_location}`,
             icon: '/favicon.ico',
             requireInteraction: true
           });
-          toast.info('New ride request available!');
+          toast.info('New ride request in your area!');
           fetchRides();
         }
       )
@@ -427,8 +455,11 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
         ) : (
           <div className="space-y-4">
             {pendingRides.map((ride) => (
-              <Card key={ride.id}>
+              <Card key={ride.id} className={ride.driver_id === user.id ? 'border-primary border-2' : ''}>
                 <CardContent className="pt-6 space-y-4">
+                  {ride.driver_id === user.id && (
+                    <Badge className="mb-2">🎯 Assigned to You</Badge>
+                  )}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-green-500" />
@@ -451,6 +482,17 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
                           <span>{t.paymentMethods[ride.payment_method as keyof typeof t.paymentMethods]}</span>
                         </div>
                       )}
+                      {ride.distance_km && (
+                        <div className="flex items-center gap-1">
+                          <Navigation className="h-4 w-4" />
+                          <span>{ride.distance_km.toFixed(1)} km</span>
+                        </div>
+                      )}
+                      {ride.estimated_price && (
+                        <div className="flex items-center gap-1 font-semibold text-primary">
+                          💰 {ride.estimated_price} TND
+                        </div>
+                      )}
                     </div>
                     {ride.is_scheduled && ride.scheduled_time && (
                       <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
@@ -465,7 +507,11 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={() => acceptRide(ride.id)} className="flex-1">
+                    <Button 
+                      onClick={() => acceptRide(ride.id)} 
+                      className="flex-1"
+                      variant={ride.driver_id === user.id ? 'default' : 'outline'}
+                    >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       {t.accept}
                     </Button>

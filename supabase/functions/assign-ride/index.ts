@@ -93,16 +93,34 @@ serve(async (req) => {
     }
 
 
-    // 4. Assign the ride to the closest driver
+    // 4. Assign the ride to the closest driver (but don't auto-accept)
+    // Keep status as 'pending' so driver can accept/reject
     const { error: updateError } = await supabaseAdmin
       .from('rides')
-      .update({ driver_id: closestDriver.user_id, status: 'accepted' })
+      .update({ 
+        driver_id: closestDriver.user_id
+        // Status remains 'pending' so driver must manually accept
+      })
       .eq('id', rideId);
 
     if (updateError) throw new Error(`Ride assignment error: ${updateError.message}`);
     
-    // 5. Notify the assigned driver (optional, requires real-time subscription on driver's side)
-    // This is implicitly handled by the driver dashboard's subscription to the 'rides' table.
+    console.log(`Ride ${rideId} assigned to driver ${closestDriver.user_id} at ${minDistance.toFixed(2)}km away`);
+    
+    // 5. Create notification for the assigned driver
+    const { error: notifError } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: closestDriver.user_id,
+        title: 'New Ride Request',
+        message: `You have a new ride request ${minDistance.toFixed(1)}km away`,
+        type: 'ride_request',
+        ride_id: rideId
+      });
+    
+    if (notifError) console.error('Failed to create notification:', notifError);
+    
+    // The driver will be notified via real-time subscription
 
     return new Response(JSON.stringify({ message: 'Ride assigned successfully', driverId: closestDriver.user_id, distance: minDistance }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
