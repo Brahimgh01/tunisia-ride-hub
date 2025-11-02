@@ -191,7 +191,20 @@ export default function DriverDashboard() {
       .eq('driver_id', user.id)
       .single();
     
-    if (!error && data) {
+    if (error) {
+      console.error('Subscription fetch error:', error);
+      // No subscription found - keep default inactive state
+      setSubscription({
+        isTrial: false,
+        trialEndDate: null,
+        subscriptionEndDate: null,
+        status: 'inactive',
+        isActive: false
+      });
+      return;
+    }
+    
+    if (data) {
       const now = new Date();
       const endDate = data.is_trial && data.trial_end_date
         ? new Date(data.trial_end_date)
@@ -199,7 +212,7 @@ export default function DriverDashboard() {
         ? new Date(data.subscription_end_date)
         : null;
       
-      const isActive = endDate ? endDate > now : false;
+      const isActive = endDate ? endDate > now : data.status === 'active';
       
       setSubscription({
         isTrial: data.is_trial || false,
@@ -383,16 +396,23 @@ export default function DriverDashboard() {
                     id="availability-switch"
                     checked={isAvailable}
                     onCheckedChange={handleAvailabilityChange}
-                    disabled={!isVerified}
+                    disabled={!isVerified || !subscription.isActive}
                   />
                   <Label htmlFor="availability-switch" className="cursor-pointer font-medium">
                     {t.availability}
                   </Label>
                 </div>
                 {!isVerified && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Pending verification
-                  </p>
+                  <div className="text-xs mt-2 p-2 bg-yellow-500/10 rounded border border-yellow-500/20">
+                    <p className="text-yellow-600 dark:text-yellow-400 font-medium">⏳ Verification in Progress</p>
+                    <p className="text-muted-foreground mt-1">Admin will verify your documents within 24 hours.</p>
+                  </div>
+                )}
+                {isVerified && !subscription.isActive && (
+                  <div className="text-xs mt-2 p-2 bg-red-500/10 rounded border border-red-500/20">
+                    <p className="text-red-600 dark:text-red-400 font-medium">⚠️ Subscription Required</p>
+                    <p className="text-muted-foreground mt-1">Renew your subscription to accept rides.</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -466,39 +486,61 @@ export default function DriverDashboard() {
         </div>
 
         {/* Subscription Status */}
-        {subscription && (
-          <Card className={`${subscription.isActive ? 'border-green-500' : 'border-orange-500'}`}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  {t.subscription}
-                </CardTitle>
-                <Badge variant={subscription.isActive ? "default" : "destructive"}>
-                  {subscription.isTrial ? t.trial : subscription.isActive ? t.active : t.expired}
-                </Badge>
+        <Card className={`${subscription.isActive ? 'border-green-500' : 'border-red-500'}`}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                {t.subscription}
+              </CardTitle>
+              <Badge variant={subscription.isActive ? "default" : "destructive"}>
+                {subscription.isTrial ? t.trial : subscription.isActive ? t.active : t.expired}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {subscription.isActive ? (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {subscription.isTrial ? 'Free Trial' : 'Subscription'} ends in:
+                </p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {Math.max(0, Math.ceil((new Date(subscription.isTrial && subscription.trialEndDate ? subscription.trialEndDate : subscription.subscriptionEndDate || '').getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days
+                </p>
+                {subscription.isTrial && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    🎉 Enjoy your free trial! No payment required yet.
+                  </p>
+                )}
               </div>
-            </CardHeader>
-            <CardContent>
-              {subscription.isActive && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">
-                    {subscription.isTrial ? 'Trial' : 'Subscription'} {t.daysLeft}:
-                  </p>
-                  <p className="text-lg font-bold">
-                    {Math.ceil((new Date(subscription.isTrial && subscription.trialEndDate ? subscription.trialEndDate : subscription.subscriptionEndDate || '').getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days
-                  </p>
-                </div>
-              )}
-              {!subscription.isActive && (
-                <Button className="w-full" size="sm">
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                  Your subscription has expired. Renew to continue accepting rides.
+                </p>
+                <Button 
+                  className="w-full" 
+                  size="sm"
+                  onClick={async () => {
+                    toast.info('Opening payment page...');
+                    // TODO: Integrate Stripe payment
+                    const { data, error } = await supabase.functions.invoke('create-driver-subscription-checkout', {
+                      body: { driverId: user?.id }
+                    });
+                    if (error) {
+                      toast.error('Failed to open payment page. Please contact support.');
+                    } else if (data?.url) {
+                      window.open(data.url, '_blank');
+                    }
+                  }}
+                >
                   <Calendar className="h-4 w-4 mr-2" />
-                  Renew Subscription
+                  Renew Subscription (50 TND/month)
                 </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Separator />
 

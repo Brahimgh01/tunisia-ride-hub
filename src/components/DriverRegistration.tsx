@@ -143,13 +143,14 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
     
     if (subscriptionError) {
       console.error('Error creating subscription:', subscriptionError);
-      toast.error('Profile created but subscription setup failed. Please contact support.');
-    } else {
-      toast.success('Registration successful! You have 1 month free trial. Access your dashboard now.');
+      toast.error('Failed to create subscription. Please try again.');
+      setLoading(false);
+      return;
     }
 
-    onRegistrationComplete();
+    toast.success('Registration successful! You have 1 month free trial. Verification pending.');
     setLoading(false);
+    onRegistrationComplete();
   };
 
   const canProceedToStep2 = vehicleType && vehicleModel && vehicleColor && licensePlate;

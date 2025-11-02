@@ -46,6 +46,8 @@ export interface Ride {
   dropoff_lng: number;
   status: 'pending' | 'accepted' | 'driver_en_route' | 'driver_arrived' | 'in_progress' | 'completed' | 'canceled' | 'rated';
   final_price?: number;
+  estimated_price?: number;
+  distance_km?: number;
   ride_type?: 'taxi' | 'premium' | 'carpooling' | 'motorcycle';
   payment_method?: 'cash' | 'konnect' | 'edinar' | 'card';
   scheduled_time?: string;
