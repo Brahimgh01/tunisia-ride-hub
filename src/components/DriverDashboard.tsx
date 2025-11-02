@@ -396,19 +396,13 @@ export default function DriverDashboard() {
                     id="availability-switch"
                     checked={isAvailable}
                     onCheckedChange={handleAvailabilityChange}
-                    disabled={!isVerified || !subscription.isActive}
+                    disabled={!subscription.isActive}
                   />
                   <Label htmlFor="availability-switch" className="cursor-pointer font-medium">
                     {t.availability}
                   </Label>
                 </div>
-                {!isVerified && (
-                  <div className="text-xs mt-2 p-2 bg-yellow-500/10 rounded border border-yellow-500/20">
-                    <p className="text-yellow-600 dark:text-yellow-400 font-medium">⏳ Verification in Progress</p>
-                    <p className="text-muted-foreground mt-1">Admin will verify your documents within 24 hours.</p>
-                  </div>
-                )}
-                {isVerified && !subscription.isActive && (
+                {!subscription.isActive && (
                   <div className="text-xs mt-2 p-2 bg-red-500/10 rounded border border-red-500/20">
                     <p className="text-red-600 dark:text-red-400 font-medium">⚠️ Subscription Required</p>
                     <p className="text-muted-foreground mt-1">Renew your subscription to accept rides.</p>

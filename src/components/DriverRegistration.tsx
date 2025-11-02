@@ -148,7 +148,21 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
       return;
     }
 
-    toast.success('Registration successful! You have 1 month free trial. Verification pending.');
+    // Auto-verify driver (no admin approval needed)
+    const { error: verifyError } = await supabase
+      .from('driver_profiles')
+      .update({ 
+        is_verified: true,
+        is_available: false,
+        id_verification_status: 'approved'
+      })
+      .eq('driver_id', user.id);
+    
+    if (verifyError) {
+      console.error('Error verifying driver:', verifyError);
+    }
+
+    toast.success('✅ Registration complete! You have 1 month free trial. You can now accept rides!');
     setLoading(false);
     onRegistrationComplete();
   };
