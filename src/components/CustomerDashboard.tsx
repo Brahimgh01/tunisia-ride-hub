@@ -108,49 +108,68 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
   };
 
   return (
-    <div className={`fixed inset-0 flex flex-col bg-background ${language === 'ar' ? 'rtl' : 'ltr'}`}>
-      {/* Minimal Top Bar */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-3 bg-background/80 backdrop-blur-lg border-b">
-        <Button onClick={onBack} variant="ghost" size="sm" className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        
-        <div className="flex items-center gap-2">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <History className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="h-[80vh]">
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5" />
-                  {t.history}
-                </SheetTitle>
-              </SheetHeader>
-              <div className="mt-4 overflow-y-auto max-h-[calc(80vh-80px)]">
-                <RideHistory language={language} />
-              </div>
-            </SheetContent>
-          </Sheet>
+    <div className={`fixed inset-0 flex flex-col bg-gradient-to-br from-background via-background/95 to-muted/30 ${language === 'ar' ? 'rtl' : 'ltr'}`}>
+      {/* Modern Top Bar */}
+      <div className="absolute top-0 left-0 right-0 z-20 bg-background/90 backdrop-blur-xl border-b border-border/50 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button 
+            onClick={onBack} 
+            variant="ghost" 
+            size="sm" 
+            className="gap-2 hover:bg-primary/10 transition-all"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="font-medium">{t.back}</span>
+          </Button>
           
-          {user && <NotificationBell userId={user.id} />}
+          <div className="flex items-center gap-2">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="gap-2 hover:bg-primary/10 transition-all"
+                >
+                  <History className="h-4 w-4" />
+                  <span className="hidden sm:inline font-medium">{t.history}</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl">
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2 text-xl">
+                    <History className="h-5 w-5 text-primary" />
+                    {t.history}
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 overflow-y-auto max-h-[calc(85vh-100px)]">
+                  <RideHistory language={language} />
+                </div>
+              </SheetContent>
+            </Sheet>
+            
+            {user && <NotificationBell userId={user.id} />}
+          </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 relative">
+      {/* Main Content Area */}
+      <div className="flex-1 relative mt-14">
         {loadingRide ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-background">
-            <div className="text-center space-y-3">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-              <p className="text-sm text-muted-foreground">{t.loading}</p>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="relative">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/30 border-t-primary mx-auto"></div>
+                <MapPin className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-primary animate-pulse" />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">{t.loading}</p>
             </div>
           </div>
         ) : error ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-background">
-            <div className="text-center p-8 text-destructive">{error}</div>
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <div className="text-center p-8 bg-destructive/10 rounded-2xl border border-destructive/20 max-w-md">
+              <div className="text-destructive font-semibold text-lg mb-2">⚠️ Error</div>
+              <div className="text-destructive/80">{error}</div>
+            </div>
           </div>
         ) : activeRide ? (
           <RideStatus rideId={activeRide.id} onRideComplete={handleRideComplete} />

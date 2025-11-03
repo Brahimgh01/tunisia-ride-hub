@@ -117,6 +117,8 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
       return;
     }
 
+    toast.dismiss();
+
     // Create subscription with 1-month free trial
     const trialStartDate = new Date();
     const trialEndDate = new Date();
@@ -124,7 +126,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
 
     const { error: subscriptionError } = await supabase
       .from('driver_subscriptions')
-      .insert({
+      .upsert({
         driver_id: user.id,
         license_number: licensePlate,
         car_number: licensePlate,
@@ -135,11 +137,13 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
         is_trial: true,
         trial_start_date: trialStartDate.toISOString(),
         trial_end_date: trialEndDate.toISOString(),
+        subscription_start_date: trialStartDate.toISOString(),
+        subscription_end_date: trialEndDate.toISOString(),
         subscription_type: 'monthly',
         monthly_fee: 50.00
+      }, {
+        onConflict: 'driver_id'
       });
-
-    toast.dismiss();
     
     if (subscriptionError) {
       console.error('Error creating subscription:', subscriptionError);

@@ -191,8 +191,18 @@ const BookRide = ({ language, isMobileFullScreen = false }: BookRideProps) => {
   };
 
   const handleBookRide = async () => {
-    if (!user || !pickupCoords || !dropoffCoords) {
-      toast.error('Please set pickup and drop-off locations');
+    if (!user) {
+      toast.error('Please log in first');
+      return;
+    }
+
+    if (!pickupLocation || !dropoffLocation) {
+      toast.error('Please enter both pickup and drop-off locations');
+      return;
+    }
+
+    if (!pickupCoords || !dropoffCoords) {
+      toast.error('Please select locations on the map');
       return;
     }
     
@@ -216,22 +226,33 @@ const BookRide = ({ language, isMobileFullScreen = false }: BookRideProps) => {
         status: 'pending'
       }).select().single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Ride creation error:', error);
+        throw error;
+      }
+
+      toast.success(t.success);
 
       if (rideData && !isScheduled) {
         toast.loading('Finding closest driver...');
         const { error: assignError } = await supabase.functions.invoke('assign-ride', {
           body: { rideId: rideData.id }
         });
-        if (assignError) toast.error('No available drivers. Your ride is pending.');
-        else toast.success('Driver assigned!');
+        toast.dismiss();
+        if (assignError) {
+          console.error('Assign error:', assignError);
+          toast.info('Your ride is pending. Drivers will be notified!');
+        } else {
+          toast.success('Driver notified!');
+        }
       }
-      toast.success(t.success);
+      
       setPickupLocation('');
       setDropoffLocation('');
       setPickupCoords(null);
       setDropoffCoords(null);
     } catch (error: any) {
+      console.error('Book ride error:', error);
       toast.error(error.message || t.error);
     } finally {
       setLoading(false);
