@@ -526,21 +526,12 @@ export default function DriverDashboard() {
                 <Button 
                   className="w-full" 
                   size="sm"
-                  onClick={async () => {
-                    toast.info('Opening payment page...');
-                    // TODO: Integrate Stripe payment
-                    const { data, error } = await supabase.functions.invoke('create-driver-subscription-checkout', {
-                      body: { driverId: user?.id }
-                    });
-                    if (error) {
-                      toast.error('Failed to open payment page. Please contact support.');
-                    } else if (data?.url) {
-                      window.open(data.url, '_blank');
-                    }
+                  onClick={() => {
+                    toast.info('💳 Contact support at: support@uber-tunisia.com to renew your subscription (50 TND/month)');
                   }}
                 >
                   <Calendar className="h-4 w-4 mr-2" />
-                  Renew Subscription (50 TND/month)
+                  Contact Support to Renew (50 TND/month)
                 </Button>
               </div>
             )}

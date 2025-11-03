@@ -268,9 +268,9 @@ const BookRide = ({ language, isMobileFullScreen = false }: BookRideProps) => {
 
   if (isMobileFullScreen) {
     return (
-      <div className="absolute inset-0 flex flex-col">
-        {/* Full Screen Map */}
-        <div className="flex-1">
+      <div className="absolute inset-0 flex flex-col bg-background">
+        {/* Map Section - Fixed Height */}
+        <div className="h-[45vh] relative">
           <Map
             pickupLocation={pickupCoords}
             dropoffLocation={dropoffCoords}
@@ -283,9 +283,9 @@ const BookRide = ({ language, isMobileFullScreen = false }: BookRideProps) => {
           />
         </div>
 
-        {/* Bottom Booking Card - Slides up on mobile */}
-        <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl rounded-t-3xl shadow-2xl border-t max-h-[75vh] overflow-y-auto">
-          <div className="w-12 h-1 bg-muted rounded-full mx-auto mt-3 mb-4"></div>
+        {/* Booking Card - Takes remaining space */}
+        <div className="flex-1 bg-background rounded-t-3xl shadow-2xl border-t overflow-y-auto -mt-6 relative z-10">
+          <div className="w-12 h-1.5 bg-muted/40 rounded-full mx-auto mt-3 mb-4"></div>
           
           <div className="px-4 pb-6 space-y-4">
             <div className="flex items-center justify-between">
