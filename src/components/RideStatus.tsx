@@ -50,28 +50,39 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
     try {
       const { data, error } = await supabase
         .from('rides')
-        .select(`
-          *,
-          driver:profiles!rides_driver_id_fkey (
-            full_name,
-            phone,
-            vehicle_model,
-            vehicle_color,
-            license_plate_number
-          )
-        `)
+        .select(`*, driver:profiles!rides_driver_id_fkey ( full_name, phone )`)
         .eq('id', rideId)
         .single();
 
       if (error) throw error;
-      setRide(data as unknown as Ride);
-      
+
+      // Attach vehicle info from driver_profiles (these live in a separate table)
+      const rideData = data as any;
+      if (rideData?.driver_id) {
+        const { data: dp, error: dpErr } = await supabase
+          .from('driver_profiles')
+          .select('vehicle_model, vehicle_color, license_plate_number')
+          .eq('driver_id', rideData.driver_id)
+          .single();
+
+        if (!dpErr && dp) {
+          rideData.driver = {
+            ...(rideData.driver || {}),
+            vehicle_model: dp.vehicle_model,
+            vehicle_color: dp.vehicle_color,
+            license_plate_number: dp.license_plate_number,
+          };
+        }
+      }
+
+      setRide(rideData as unknown as Ride);
+
       // Check for status change and notify
-      if (data.status && prevStatusRef.current !== data.status) {
+      if (rideData.status && prevStatusRef.current !== rideData.status) {
           if(prevStatusRef.current !== null) { // Don't notify on first load
-            showNotification("Ride Status Updated", { body: `Your ride is now ${data.status}.` });
+            showNotification("Ride Status Updated", { body: `Your ride is now ${rideData.status}.` });
           }
-          prevStatusRef.current = data.status;
+          prevStatusRef.current = rideData.status;
       }
 
     } catch (err: any) {
@@ -102,19 +113,61 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
 
   const handleCancelRide = async () => {
     setLoading(true);
+    // Double-check ownership to avoid RLS rejects
+    try {
+      const { data: rideCheck, error: checkErr } = await supabase
+        .from('rides')
+        .select('customer_id, status')
+        .eq('id', rideId)
+        .single();
+
+      if (checkErr) {
+        console.error('Ride check error before cancel:', checkErr);
+        toast.error('Unable to verify ride ownership before canceling.');
+        setLoading(false);
+        return;
+      }
+
+      if (!rideCheck) {
+        toast.error('Ride not found');
+        setLoading(false);
+        return;
+      }
+
+      if (rideCheck.customer_id !== user!.id) {
+        toast.error('You are not authorized to cancel this ride (ownership mismatch).');
+        setLoading(false);
+        return;
+      }
+
+      if (rideCheck.status !== 'pending') {
+        toast.error('Only pending rides can be canceled.');
+        setLoading(false);
+        return;
+      }
+
+    } catch (err) {
+      console.error('Pre-cancel check failed:', err);
+      toast.error('Pre-cancel verification failed');
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase
       .from('rides')
       .update({ 
-        status: 'canceled',
+        status: 'cancelled',
         cancelled_at: new Date().toISOString(),
         cancelled_by: 'customer'
       })
       .eq('id', rideId)
-      .eq('customer_id', user!.id);
+      .eq('customer_id', user!.id)
+      .eq('status', 'pending');
     
     if (error) {
       console.error('Cancel error:', error);
-      toast.error("Failed to cancel ride.");
+      const message = error.message || 'Failed to cancel ride.';
+      toast.error(`${message}${error.details ? ` - ${error.details}` : ''}`);
     } else {
       toast.success("Ride has been canceled.");
       onRideComplete();
@@ -171,7 +224,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
               <Badge variant={ride.status === 'completed' ? 'default' : 'secondary'}>
                 {ride.status.replace('_', ' ').toUpperCase()}
               </Badge>
-              {ride.driver && ride.status !== 'completed' && ride.status !== 'canceled' && (
+              {ride.driver && ride.status !== 'completed' && ride.status !== 'cancelled' && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -216,8 +269,8 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
               <AlertTitle>Driver on the way!</AlertTitle>
               <AlertDescription>
                 {ride.driver.full_name} is coming to pick you up.
-                <p>Vehicle: {ride.driver.vehicle_model} ({ride.driver.vehicle_color})</p>
-                <p>License Plate: {ride.driver.license_plate_number}</p>
+                <p>Vehicle: {ride.driver?.vehicle_model ?? 'Unknown'} ({ride.driver?.vehicle_color ?? 'N/A'})</p>
+                <p>License Plate: {ride.driver?.license_plate_number ?? 'N/A'}</p>
               </AlertDescription>
             </Alert>
           )}
@@ -245,7 +298,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
           </Card>
       )}
 
-      {(ride.status === 'completed' || ride.status === 'rated' || ride.status === 'canceled') && (
+  {(ride.status === 'completed' || ride.status === 'rated' || ride.status === 'cancelled') && (
           <Button onClick={onRideComplete} className="w-full">
               Book Another Ride
           </Button>

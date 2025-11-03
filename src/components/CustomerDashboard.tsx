@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import BookRide from './BookRide';
 import RideStatus from './RideStatus';
@@ -36,6 +37,11 @@ const translations = {
 };
 
 export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
+  // detect mobile to toggle the mobile-fullscreen booking layout
+  // use hook so we only enable the mobile fullscreen UI on small screens
+  // (previously BookRide was always forced into mobile fullscreen)
+  // This prevents the map from taking the entire dashboard on desktop.
+  const isMobile = useIsMobile();
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [loadingRide, setLoadingRide] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,10 +114,10 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
   };
 
   return (
-    <div className={`fixed inset-0 flex flex-col bg-gradient-to-br from-background via-background/95 to-muted/30 ${language === 'ar' ? 'rtl' : 'ltr'}`}>
-      {/* Modern Top Bar */}
-      <div className="absolute top-0 left-0 right-0 z-20 bg-background/90 backdrop-blur-xl border-b border-border/50 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3">
+    <div className={`min-h-screen flex flex-col bg-gradient-to-br from-background via-background/95 to-muted/30 ${language === 'ar' ? 'rtl' : 'ltr'}`}>
+      {/* Modern Top Bar - sticky so page can scroll */}
+      <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-xl border-b border-border/50 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3 max-w-6xl mx-auto">
           <Button 
             onClick={onBack} 
             variant="ghost" 
@@ -152,8 +158,8 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 relative mt-14">
+      {/* Main Content Area - scrollable */}
+      <div className="flex-1 relative mt-6 overflow-auto">
         {loadingRide ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center space-y-4">
@@ -174,7 +180,9 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
         ) : activeRide ? (
           <RideStatus rideId={activeRide.id} onRideComplete={handleRideComplete} />
         ) : (
-          <BookRide language={language} isMobileFullScreen={true} />
+          <div className="max-w-6xl mx-auto px-4 pb-8">
+            <BookRide language={language} isMobileFullScreen={isMobile} />
+          </div>
         )}
       </div>
     </div>

@@ -149,20 +149,32 @@ export default function DriverDashboard() {
             
             const { data: driverData, error: driverError } = await supabase
               .from('driver_profiles')
-              .select('is_verified, is_available')
+              .select('*')
               .eq('driver_id', user.id)
               .single();
-            
+
             if (driverError && driverError.code !== 'PGRST116') {
               console.error('Error fetching driver profile:', driverError);
             }
-            
-            if (driverData) {
+
+            // Only consider registered if all required fields are present and verified
+            const requiredFields = [
+              'vehicle_type',
+              'vehicle_model',
+              'vehicle_color',
+              'license_plate_number',
+              'id_document_front_url',
+              'id_document_back_url',
+              'license_document_url',
+              'vehicle_registration_document_url'
+            ];
+            const hasAllFields = driverData && requiredFields.every(f => driverData[f]);
+            const isProfileVerified = driverData && driverData.is_verified;
+
+            if (hasAllFields && isProfileVerified) {
               setIsRegistered(true);
               setIsVerified(driverData.is_verified || false);
               setIsAvailable(driverData.is_available || false);
-              
-              // Fetch driver stats and subscription
               await fetchDriverStats();
               await fetchSubscription();
             } else {
@@ -526,9 +538,38 @@ export default function DriverDashboard() {
                 <Button 
                   className="w-full" 
                   size="sm"
-                  onClick={() => {
-                    toast.info('💳 Contact support at: support@uber-tunisia.com to renew your subscription (50 TND/month)');
-                  }}
+                    onClick={async () => {
+                      if (!user) {
+                        toast.error('Please sign in to renew');
+                        return;
+                      }
+
+                      try {
+                        toast.loading('Redirecting to checkout...');
+                        const { data, error } = await supabase.functions.invoke('create-checkout', {
+                          body: JSON.stringify({ driverId: user.id })
+                        });
+
+                        toast.dismiss();
+
+                        if (error) {
+                          console.error('Checkout function error:', error);
+                          toast.error('Unable to create checkout session. Please contact support.');
+                          return;
+                        }
+
+                        // Expecting the function to return a URL to redirect the user to
+                        const checkoutUrl = data?.url || data?.checkout_url || null;
+                        if (checkoutUrl) {
+                          window.location.href = checkoutUrl;
+                        } else {
+                          toast.info('💳 Contact support at: support@uber-tunisia.com to renew your subscription (50 TND/month)');
+                        }
+                      } catch (err) {
+                        console.error('Error creating checkout:', err);
+                        toast.error('Something went wrong creating the checkout session.');
+                      }
+                    }}
                 >
                   <Calendar className="h-4 w-4 mr-2" />
                   Contact Support to Renew (50 TND/month)

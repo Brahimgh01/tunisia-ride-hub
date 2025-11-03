@@ -48,7 +48,8 @@ const Map = ({
   const [currentLocation, setCurrentLocation] = useState<MapLocation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [distance, setDistance] = useState<number | null>(null);
-  const [routeLayer, setRouteLayer] = useState<string | null>(null);
+  // routeLayer state not needed — use a stable id for the route layer to avoid flicker
+  const routeAnimRef = useRef<number | null>(null);
   const selectingLocationRef = useRef<'pickup' | 'dropoff' | null>(null);
   const [selectingLocation, setSelectingLocation] = useState<'pickup' | 'dropoff' | null>(null);
   const { toast } = useToast();
@@ -203,35 +204,51 @@ const Map = ({
         }
       };
 
-      // Remove old route if exists
-      if (routeLayer && map.current.getLayer(routeLayer)) {
-        map.current.removeLayer(routeLayer);
-        map.current.removeSource(routeLayer);
+      // Use a fixed layer id so we update the source data instead of remove/add repeatedly.
+      const layerId = 'route-layer';
+      const shadowLayerId = 'route-shadow-layer';
+
+      // If the source exists update data, otherwise create source + two layers (shadow + main)
+      // clear any previous animation before updating route
+      if (routeAnimRef.current) {
+        window.clearInterval(routeAnimRef.current);
+        routeAnimRef.current = null;
       }
 
-      const layerId = 'route-' + Date.now();
-      
       if (map.current.getSource(layerId)) {
-        (map.current.getSource(layerId) as any).setData(geojson);
-      } else {
-        map.current.addLayer({
-          id: layerId,
-          type: 'line',
-          source: {
-            type: 'geojson',
-            data: geojson
-          },
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#3b82f6',
-            'line-width': 5,
-            'line-opacity': 0.75
+        try {
+          (map.current.getSource(layerId) as any).setData(geojson);
+          if (map.current.getSource(shadowLayerId)) {
+            (map.current.getSource(shadowLayerId) as any).setData(geojson);
           }
-        });
-        setRouteLayer(layerId);
+        } catch (err) {
+          // If setData fails, remove and recreate
+          if (map.current.getLayer(layerId)) map.current.removeLayer(layerId);
+          if (map.current.getLayer(shadowLayerId)) map.current.removeLayer(shadowLayerId);
+          if (map.current.getSource(layerId)) map.current.removeSource(layerId);
+          if (map.current.getSource(shadowLayerId)) map.current.removeSource(shadowLayerId);
+          addRouteLayers(map.current, layerId, shadowLayerId, geojson);
+        }
+      } else {
+        addRouteLayers(map.current, layerId, shadowLayerId, geojson);
+      }
+
+      // Start a subtle dash animation on the route to indicate direction/motion
+      try {
+        let offset = 0;
+        routeAnimRef.current = window.setInterval(() => {
+          if (!map.current) return;
+          // cycle dash pattern to create motion illusion
+          const dash = [Math.abs(Math.sin(offset)) * 2 + 1, 6];
+          try {
+            map.current.setPaintProperty(layerId, 'line-dasharray', dash as any);
+            offset += 0.3;
+          } catch (e) {
+            // ignore if paint property not supported
+          }
+        }, 300) as unknown as number;
+      } catch (e) {
+        // ignore animation errors
       }
 
       // Fit map to show the entire route
@@ -248,6 +265,46 @@ const Map = ({
     }
   };
 
+  // Helper to add shadow + main route layers
+  const addRouteLayers = (mapInstance: mapboxgl.Map, layerId: string, shadowLayerId: string, geojson: any) => {
+    // Add source
+    mapInstance.addSource(layerId, { type: 'geojson', data: geojson });
+
+    // Shadow (wider, subtle darker line)
+    mapInstance.addLayer({
+      id: shadowLayerId,
+      type: 'line',
+      source: layerId,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#7f1d1d',
+        'line-width': 10,
+        'line-opacity': 0.12
+      }
+    });
+
+    // Main route
+    mapInstance.addLayer({
+      id: layerId,
+      type: 'line',
+      source: layerId,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        // Use a red gradient for the route
+        'line-color': '#ef4444',
+        'line-width': 6,
+        'line-opacity': 0.98,
+        'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#fca5a5', 1, '#ef4444']
+      }
+    });
+  };
+
   const updateMapMarkers = () => {
     if (!map.current) return;
 
@@ -256,15 +313,41 @@ const Map = ({
       if (pickupMarker.current) {
         pickupMarker.current.setLngLat([pickupLocation.lng, pickupLocation.lat]);
       } else {
+        const wrapper = document.createElement('div');
+  wrapper.className = 'map-marker-wrapper';
+  wrapper.style.position = 'relative';
+
+  const pulse = document.createElement('div');
+  pulse.className = 'marker-pulse';
+  // place pulse behind svg
+  pulse.style.zIndex = '0';
+
+  // ensure svg and label are above pulse
+
         const el = document.createElement('div');
         el.className = 'custom-marker';
         el.innerHTML = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
           <circle cx="20" cy="20" r="18" fill="#10b981" stroke="white" stroke-width="4"/>
           <circle cx="20" cy="20" r="8" fill="white"/>
         </svg>`;
-        pickupMarker.current = new mapboxgl.Marker({ element: el })
+
+        const label = document.createElement('div');
+        label.style.marginTop = '6px';
+        label.style.padding = '4px 8px';
+        label.style.background = 'white';
+        label.style.borderRadius = '9999px';
+        label.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)';
+        label.style.fontSize = '12px';
+        label.style.fontWeight = '600';
+        label.textContent = 'My place';
+
+  wrapper.appendChild(pulse);
+  wrapper.appendChild(el);
+  wrapper.appendChild(label);
+
+        pickupMarker.current = new mapboxgl.Marker({ element: wrapper })
           .setLngLat([pickupLocation.lng, pickupLocation.lat])
-          .addTo(map.current);
+          .addTo(map.current!);
       }
     }
 
@@ -273,15 +356,38 @@ const Map = ({
       if (dropoffMarker.current) {
         dropoffMarker.current.setLngLat([dropoffLocation.lng, dropoffLocation.lat]);
       } else {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'map-marker-wrapper';
+  wrapper.style.position = 'relative';
+
+  const pulse = document.createElement('div');
+  pulse.className = 'marker-pulse';
+  pulse.style.zIndex = '0';
+
         const el = document.createElement('div');
         el.className = 'custom-marker';
         el.innerHTML = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
           <circle cx="20" cy="20" r="18" fill="#ef4444" stroke="white" stroke-width="4"/>
           <circle cx="20" cy="20" r="8" fill="white"/>
         </svg>`;
-        dropoffMarker.current = new mapboxgl.Marker({ element: el })
+
+        const label = document.createElement('div');
+        label.style.marginTop = '6px';
+        label.style.padding = '4px 8px';
+        label.style.background = 'white';
+        label.style.borderRadius = '9999px';
+        label.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)';
+        label.style.fontSize = '12px';
+        label.style.fontWeight = '600';
+        label.textContent = 'Want to go to';
+
+  wrapper.appendChild(pulse);
+  wrapper.appendChild(el);
+  wrapper.appendChild(label);
+
+        dropoffMarker.current = new mapboxgl.Marker({ element: wrapper })
           .setLngLat([dropoffLocation.lng, dropoffLocation.lat])
-          .addTo(map.current);
+          .addTo(map.current!);
       }
     }
 

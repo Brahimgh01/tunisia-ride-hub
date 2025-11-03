@@ -1,6 +1,9 @@
+/* stylelint-disable at-rule-no-unknown */
+/* Tailwind directives are processed by PostCSS/Tailwind: */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* stylelint-enable at-rule-no-unknown */
 
 /* Tunisian-inspired design system with Mediterranean warmth
 All colors MUST be HSL for proper theming.
@@ -158,3 +161,26 @@ All colors MUST be HSL for proper theming.
     @apply bg-background text-foreground;
   }
 }
+
+/* Map marker pulse animation for Map component */
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.6); opacity: 0.25; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+.marker-pulse {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: rgba(59,130,246,0.14);
+  top: 0;
+  left: 0;
+  transform-origin: center;
+  animation: pulse 2000ms infinite ease-out;
+  pointer-events: none;
+}
+
+.map-marker-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; }
+

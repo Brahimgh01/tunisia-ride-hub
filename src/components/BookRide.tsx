@@ -43,6 +43,20 @@ const BookRide = ({ language, isMobileFullScreen = false }: BookRideProps) => {
   const [distance, setDistance] = useState<number>(0);
   const { driverLocations } = useDriverLocations();
 
+  // Keep the address input string in sync when the user selects locations on the map
+  // This ensures the destination/pickup input bars reflect map clicks.
+  useEffect(() => {
+    if (pickupCoords) {
+      setPickupLocation(`Selected: ${pickupCoords.lat.toFixed(5)}, ${pickupCoords.lng.toFixed(5)}`);
+    }
+  }, [pickupCoords]);
+
+  useEffect(() => {
+    if (dropoffCoords) {
+      setDropoffLocation(`Selected: ${dropoffCoords.lat.toFixed(5)}, ${dropoffCoords.lng.toFixed(5)}`);
+    }
+  }, [dropoffCoords]);
+
   const translations = {
     en: {
       title: 'Book a Ride',
@@ -228,6 +242,7 @@ const BookRide = ({ language, isMobileFullScreen = false }: BookRideProps) => {
 
       if (error) {
         console.error('Ride creation error:', error);
+        toast.error(`${error.message || 'Failed to create ride'}${error.details ? ` - ${error.details}` : ''}`);
         throw error;
       }
 
@@ -268,7 +283,7 @@ const BookRide = ({ language, isMobileFullScreen = false }: BookRideProps) => {
 
   if (isMobileFullScreen) {
     return (
-      <div className="absolute inset-0 flex flex-col bg-background">
+      <div className="min-h-screen flex flex-col bg-background">
         {/* Map Section - Fixed Height */}
         <div className="h-[45vh] relative">
           <Map
@@ -282,7 +297,6 @@ const BookRide = ({ language, isMobileFullScreen = false }: BookRideProps) => {
             driverLocations={driverLocations as DriverLocation[]}
           />
         </div>
-
         {/* Booking Card - Takes remaining space */}
         <div className="flex-1 bg-background rounded-t-3xl shadow-2xl border-t overflow-y-auto -mt-6 relative z-10">
           <div className="w-12 h-1.5 bg-muted/40 rounded-full mx-auto mt-3 mb-4"></div>

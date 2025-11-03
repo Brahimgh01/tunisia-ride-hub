@@ -294,28 +294,91 @@ export function ActiveRideTracker({ language }: ActiveRideTrackerProps) {
   const handleCancelRide = async () => {
     if (!activeRide || activeRide.status !== 'pending') return;
 
-    const { error } = await supabase
-      .from('rides')
-      .update({ 
-        status: 'canceled', 
+    // Verify ownership and status before attempting update to avoid RLS errors
+    let rideCheck: any = null;
+    try {
+      const { data, error: checkErr } = await supabase
+        .from('rides')
+        .select('customer_id, status')
+        .eq('id', activeRide.id)
+        .single();
+
+      rideCheck = data;
+
+      if (checkErr) {
+        console.error('Ride check error before cancel:', checkErr);
+        toast({ title: 'Error', description: 'Unable to verify ride before canceling', variant: 'destructive' });
+        return;
+      }
+
+      if (!rideCheck) {
+        toast({ title: 'Error', description: 'Ride not found', variant: 'destructive' });
+        return;
+      }
+
+      if (rideCheck.customer_id !== user!.id) {
+        toast({ title: 'Error', description: 'You are not authorized to cancel this ride', variant: 'destructive' });
+        return;
+      }
+
+      if (rideCheck.status !== 'pending') {
+        toast({ title: 'Error', description: 'Only pending rides can be canceled', variant: 'destructive' });
+        return;
+      }
+    } catch (err) {
+      console.error('Pre-cancel check failed:', err);
+      toast({ title: 'Error', description: 'Pre-cancel verification failed', variant: 'destructive' });
+      return;
+    }
+
+    // Attempt update and capture richer diagnostics on failure to diagnose RLS
+    try {
+      const authInfo = await supabase.auth.getUser();
+      const updatePayload = {
+        status: 'cancelled',
         cancelled_at: new Date().toISOString(),
         cancelled_by: 'customer',
-        cancellation_reason: 'Customer cancelled'
-      })
-      .eq('id', activeRide.id);
+        cancellation_reason: 'Customer cancelled',
+      };
 
-    if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to cancel ride',
-        variant: 'destructive',
+      console.debug('Attempting ride cancel', {
+        userFromHook: user,
+        authInfo,
+        rideId: activeRide.id,
+        preCheck: { rideCheck },
+        updatePayload,
       });
-    } else {
+
+      const { data: updatedData, error: updateError } = await supabase
+        .from('rides')
+        .update(updatePayload)
+        .eq('id', activeRide.id)
+        .eq('status', 'pending')
+        .select();
+
+      if (updateError) {
+        // Log the full error object and any data returned for debugging RLS
+        console.error('Cancel error (full):', {
+          updateError,
+          updatedData,
+        });
+        const description = updateError.message || 'Failed to cancel ride';
+        toast({
+          title: 'Error',
+          description: `${description}${updateError.details ? ` - ${updateError.details}` : ''}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       toast({
         title: 'Success',
         description: 'Ride canceled successfully',
       });
       setActiveRide(null);
+    } catch (err) {
+      console.error('Unexpected error when cancelling ride:', err);
+      toast({ title: 'Error', description: 'Unexpected error while cancelling ride', variant: 'destructive' });
     }
   };
 

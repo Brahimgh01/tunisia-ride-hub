@@ -44,7 +44,8 @@ export interface Ride {
   pickup_lng: number;
   dropoff_lat: number;
   dropoff_lng: number;
-  status: 'pending' | 'accepted' | 'driver_en_route' | 'driver_arrived' | 'in_progress' | 'completed' | 'canceled' | 'rated';
+  // Note: DB uses 'cancelled' spelling
+  status: 'pending' | 'accepted' | 'driver_en_route' | 'driver_arrived' | 'in_progress' | 'completed' | 'cancelled' | 'rated';
   final_price?: number;
   estimated_price?: number;
   distance_km?: number;

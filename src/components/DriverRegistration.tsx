@@ -19,6 +19,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
+  const totalSteps = 5;
   
   // Vehicle details
   const [vehicleType, setVehicleType] = useState<string>('');
@@ -91,10 +92,10 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
     toast.dismiss();
     toast.loading('Creating driver profile...');
 
-    // Create driver profile
+    // Upsert driver profile (insert or update if exists)
     const { error: profileError } = await supabase
       .from('driver_profiles')
-      .insert({
+      .upsert({
         driver_id: user.id,
         vehicle_type: vehicleType,
         vehicle_model: vehicleModel,
@@ -106,7 +107,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
         vehicle_registration_document_url: vehicleRegUrl,
         is_verified: false,
         is_available: false,
-      })
+      }, { onConflict: 'driver_id' })
       .select();
 
     if (profileError) {
@@ -124,15 +125,16 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
     const trialEndDate = new Date();
     trialEndDate.setMonth(trialEndDate.getMonth() + 1);
 
+    // Upsert driver subscription (insert or update if exists)
     const { error: subscriptionError } = await supabase
       .from('driver_subscriptions')
       .upsert({
         driver_id: user.id,
-        license_number: licensePlate,
-        car_number: licensePlate,
-        vehicle_type: vehicleType,
-        vehicle_model: vehicleModel,
-        vehicle_color: vehicleColor,
+        license_number: licensePlate || '',
+        car_number: licensePlate || '',
+        vehicle_type: vehicleType || '',
+        vehicle_model: vehicleModel || '',
+        vehicle_color: vehicleColor || '',
         status: 'active',
         is_trial: true,
         trial_start_date: trialStartDate.toISOString(),
@@ -143,11 +145,12 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
         monthly_fee: 50.00
       }, {
         onConflict: 'driver_id'
-      });
-    
+      })
+      .select();
+
     if (subscriptionError) {
       console.error('Error creating subscription:', subscriptionError);
-      toast.error('Failed to create subscription. Please try again.');
+      toast.error(subscriptionError.message || 'Failed to create subscription. Please try again.');
       setLoading(false);
       return;
     }
@@ -181,14 +184,14 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3, 4, 5].map((s) => (
               <div key={s} className="flex items-center">
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
                   step >= s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}>
                   {step > s ? <Check className="h-5 w-5" /> : s}
                 </div>
-                {s < 4 && <div className={`h-1 w-16 mx-2 ${step > s ? 'bg-primary' : 'bg-muted'}`} />}
+                {s < 5 && <div className={`h-1 w-16 mx-2 ${step > s ? 'bg-primary' : 'bg-muted'}`} />}
               </div>
             ))}
           </div>
@@ -197,6 +200,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
             <span>ID Documents</span>
             <span>License & Registration</span>
             <span>Review</span>
+            <span>Subscription</span>
           </div>
         </div>
 
@@ -281,12 +285,12 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                       <Camera className="h-4 w-4" /> National ID (Front) *
                     </Label>
                     <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
-                      <Input 
-                        id="id-front" 
-                        type="file" 
-                        onChange={(e) => handleFileChange(e, setIdFrontFile)} 
-                        accept="image/jpeg,image/png,image/jpg" 
-                        className="hidden" 
+                      <input
+                        id="id-front"
+                        type="file"
+                        onChange={(e) => handleFileChange(e as any, setIdFrontFile)}
+                        accept="image/jpeg,image/png,image/jpg"
+                        className="hidden"
                       />
                       <label htmlFor="id-front" className="cursor-pointer">
                         {idFrontFile ? (
@@ -308,13 +312,13 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                     <Label htmlFor="id-back" className="flex items-center gap-2">
                       <Camera className="h-4 w-4" /> National ID (Back) *
                     </Label>
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
-                      <Input 
-                        id="id-back" 
-                        type="file" 
-                        onChange={(e) => handleFileChange(e, setIdBackFile)} 
-                        accept="image/jpeg,image/png,image/jpg" 
-                        className="hidden" 
+                      <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
+                      <input
+                        id="id-back"
+                        type="file"
+                        onChange={(e) => handleFileChange(e as any, setIdBackFile)}
+                        accept="image/jpeg,image/png,image/jpg"
+                        className="hidden"
                       />
                       <label htmlFor="id-back" className="cursor-pointer">
                         {idBackFile ? (
@@ -337,13 +341,13 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                   <Label htmlFor="license-doc" className="flex items-center gap-2">
                     <FileText className="h-4 w-4" /> Driving License *
                   </Label>
-                  <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
-                    <Input 
-                      id="license-doc" 
-                      type="file" 
-                      onChange={(e) => handleFileChange(e, setLicenseFile)} 
-                      accept="image/jpeg,image/png,image/jpg,application/pdf" 
-                      className="hidden" 
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
+                    <input
+                      id="license-doc"
+                      type="file"
+                      onChange={(e) => handleFileChange(e as any, setLicenseFile)}
+                      accept="image/jpeg,image/png,image/jpg,application/pdf"
+                      className="hidden"
                     />
                     <label htmlFor="license-doc" className="cursor-pointer">
                       {licenseFile ? (
@@ -372,12 +376,12 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                       <FileText className="h-4 w-4" /> Vehicle Registration (Carte Grise) *
                     </Label>
                     <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
-                      <Input 
-                        id="vehicle-reg" 
-                        type="file" 
-                        onChange={(e) => handleFileChange(e, setVehicleRegFile)} 
-                        accept="image/jpeg,image/png,image/jpg,application/pdf" 
-                        className="hidden" 
+                      <input
+                        id="vehicle-reg"
+                        type="file"
+                        onChange={(e) => handleFileChange(e as any, setVehicleRegFile)}
+                        accept="image/jpeg,image/png,image/jpg,application/pdf"
+                        className="hidden"
                       />
                       <label htmlFor="vehicle-reg" className="cursor-pointer">
                         {vehicleRegFile ? (
@@ -400,12 +404,12 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                       <Camera className="h-4 w-4" /> Car Photo *
                     </Label>
                     <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
-                      <Input 
-                        id="car-photo" 
-                        type="file" 
-                        onChange={(e) => handleFileChange(e, setCarPhotoFile)} 
-                        accept="image/jpeg,image/png,image/jpg" 
-                        className="hidden" 
+                      <input
+                        id="car-photo"
+                        type="file"
+                        onChange={(e) => handleFileChange(e as any, setCarPhotoFile)}
+                        accept="image/jpeg,image/png,image/jpg"
+                        className="hidden"
                       />
                       <label htmlFor="car-photo" className="cursor-pointer">
                         {carPhotoFile ? (
@@ -477,6 +481,30 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
               </div>
             )}
 
+            {/* Step 5: Subscription & Free Trial */}
+            {step === 5 && (
+              <div className="space-y-6">
+                <Card className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold mb-4 flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-green-600" /> Subscription & Free Trial
+                    </h3>
+                    <div className="text-lg mb-2">
+                      <span className="font-bold text-green-700 dark:text-green-300">You get 1 month free trial!</span>
+                    </div>
+                    <ul className="list-disc pl-6 text-sm text-muted-foreground mb-4">
+                      <li>No payment required for the first month.</li>
+                      <li>After the trial, subscription is 50 TND/month.</li>
+                      <li>You can start accepting rides immediately after approval.</li>
+                    </ul>
+                    <div className="text-blue-900 dark:text-blue-100 text-sm">
+                      By submitting, you agree to the driver terms and subscription policy.
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
             <Separator />
 
             {/* Navigation Buttons */}
@@ -486,11 +514,10 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                   Previous
                 </Button>
               )}
-              
               <div className="ml-auto">
-                {step < 4 ? (
-                  <Button 
-                    onClick={() => setStep(step + 1)} 
+                {step < totalSteps ? (
+                  <Button
+                    onClick={() => setStep(step + 1)}
                     disabled={
                       (step === 1 && !canProceedToStep2) ||
                       (step === 2 && !canProceedToStep3) ||
