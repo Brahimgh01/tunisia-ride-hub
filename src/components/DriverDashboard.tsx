@@ -189,11 +189,22 @@ export default function DriverDashboard() {
       .from('driver_subscriptions')
       .select('*')
       .eq('driver_id', user.id)
-      .single();
+      .maybeSingle();
     
     if (error) {
       console.error('Subscription fetch error:', error);
-      // No subscription found - keep default inactive state
+      setSubscription({
+        isTrial: false,
+        trialEndDate: null,
+        subscriptionEndDate: null,
+        status: 'inactive',
+        isActive: false
+      });
+      return;
+    }
+    
+    if (!data) {
+      // No subscription exists
       setSubscription({
         isTrial: false,
         trialEndDate: null,
