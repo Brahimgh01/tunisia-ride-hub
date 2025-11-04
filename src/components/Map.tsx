@@ -270,7 +270,7 @@ const Map = ({
     // Add source
     mapInstance.addSource(layerId, { type: 'geojson', data: geojson });
 
-    // Shadow (wider, subtle darker line)
+    // Shadow (wider, subtle glow effect)
     mapInstance.addLayer({
       id: shadowLayerId,
       type: 'line',
@@ -280,13 +280,14 @@ const Map = ({
         'line-cap': 'round'
       },
       paint: {
-        'line-color': '#7f1d1d',
-        'line-width': 10,
-        'line-opacity': 0.12
+        'line-color': 'hsl(0, 84%, 60%)',
+        'line-width': 12,
+        'line-opacity': 0.25,
+        'line-blur': 8
       }
     });
 
-    // Main route
+    // Main route with gradient
     mapInstance.addLayer({
       id: layerId,
       type: 'line',
@@ -296,11 +297,9 @@ const Map = ({
         'line-cap': 'round'
       },
       paint: {
-        // Use a red gradient for the route
-        'line-color': '#ef4444',
-        'line-width': 6,
-        'line-opacity': 0.98,
-        'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#fca5a5', 1, '#ef4444']
+        'line-color': 'hsl(0, 84%, 60%)',
+        'line-width': 5,
+        'line-opacity': 0.95
       }
     });
   };
@@ -326,9 +325,19 @@ const Map = ({
 
         const el = document.createElement('div');
         el.className = 'custom-marker';
-        el.innerHTML = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="20" cy="20" r="18" fill="#10b981" stroke="white" stroke-width="4"/>
-          <circle cx="20" cy="20" r="8" fill="white"/>
+        el.style.zIndex = '10';
+        el.innerHTML = `<svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="22" cy="22" r="20" fill="hsl(142, 76%, 36%)" stroke="white" stroke-width="3" filter="url(#glow)"/>
+          <circle cx="22" cy="22" r="9" fill="white"/>
+          <defs>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
         </svg>`;
 
         const label = document.createElement('div');
@@ -366,9 +375,19 @@ const Map = ({
 
         const el = document.createElement('div');
         el.className = 'custom-marker';
-        el.innerHTML = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="20" cy="20" r="18" fill="#ef4444" stroke="white" stroke-width="4"/>
-          <circle cx="20" cy="20" r="8" fill="white"/>
+        el.style.zIndex = '10';
+        el.innerHTML = `<svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="22" cy="22" r="20" fill="hsl(0, 84%, 60%)" stroke="white" stroke-width="3" filter="url(#glow2)"/>
+          <circle cx="22" cy="22" r="9" fill="white"/>
+          <defs>
+            <filter id="glow2">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
         </svg>`;
 
         const label = document.createElement('div');

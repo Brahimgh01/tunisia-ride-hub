@@ -163,24 +163,34 @@ All colors MUST be HSL for proper theming.
 }
 
 /* Map marker pulse animation for Map component */
-@keyframes pulse {
-  0% { transform: scale(1); opacity: 0.9; }
-  50% { transform: scale(1.6); opacity: 0.25; }
-  100% { transform: scale(1); opacity: 0; }
+@keyframes marker-pulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(2.2);
+    opacity: 0;
+  }
 }
 
 .marker-pulse {
   position: absolute;
-  width: 40px;
-  height: 40px;
-  border-radius: 9999px;
-  background: rgba(59,130,246,0.14);
-  top: 0;
-  left: 0;
-  transform-origin: center;
-  animation: pulse 2000ms infinite ease-out;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: hsl(var(--success) / 0.4);
+  animation: marker-pulse 2.5s ease-out infinite;
   pointer-events: none;
+  z-index: 0;
 }
 
-.map-marker-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; }
+.map-marker-wrapper { 
+  position: relative; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center;
+}
 
