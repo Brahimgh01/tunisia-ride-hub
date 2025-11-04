@@ -145,7 +145,8 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   };
 
   const updateLocationInDb = async (lat: number, lng: number) => {
-    await supabase
+    console.log('📍 Updating driver location:', { driverId, lat, lng, isOnline });
+    const { error } = await supabase
       .from('driver_locations')
       .upsert({
         driver_id: driverId,
@@ -156,6 +157,12 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       }, {
         onConflict: 'driver_id'
       });
+    
+    if (error) {
+      console.error('❌ Error updating driver location:', error);
+    } else {
+      console.log('✅ Driver location updated successfully');
+    }
   };
 
   const fetchPendingRides = async () => {

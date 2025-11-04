@@ -324,6 +324,7 @@ export default function DriverDashboard() {
   const handleAvailabilityChange = async (available: boolean) => {
     if (!user || !profile) return;
 
+    console.log('🔄 Changing availability:', { userId: user.id, available });
     setIsAvailable(available);
 
     const { error } = await supabase
@@ -332,13 +333,33 @@ export default function DriverDashboard() {
       .eq('driver_id', user.id);
 
     if (error) {
+      console.error('❌ Error updating availability:', error);
       toast.error('Failed to update availability');
       setIsAvailable(!available);
     } else {
+      console.log('✅ Availability updated in driver_profiles');
       toast.success(`You are now ${available ? 'online' : 'offline'}`);
       
-      if (available && location) {
-        updateLocationInDb(location.lat, location.lng);
+      // Force immediate location update when going online
+      if (available) {
+        if (location) {
+          await updateLocationInDb(location.lat, location.lng);
+        } else if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude } = position.coords;
+              setLocation({ lat: latitude, lng: longitude });
+              updateLocationInDb(latitude, longitude);
+            },
+            (err) => console.error('Location error:', err)
+          );
+        }
+      } else {
+        // Mark as unavailable in driver_locations when going offline
+        await supabase
+          .from('driver_locations')
+          .update({ is_available: false })
+          .eq('driver_id', user.id);
       }
     }
   };
@@ -346,7 +367,8 @@ export default function DriverDashboard() {
   const updateLocationInDb = async (lat: number, lng: number) => {
     if (!user) return;
 
-    await supabase
+    console.log('📍 Dashboard updating driver location:', { userId: user.id, lat, lng, isAvailable });
+    const { error } = await supabase
       .from('driver_locations')
       .upsert({
         driver_id: user.id,
@@ -357,6 +379,12 @@ export default function DriverDashboard() {
       }, {
         onConflict: 'driver_id'
       });
+    
+    if (error) {
+      console.error('❌ Error updating driver location:', error);
+    } else {
+      console.log('✅ Driver location updated in dashboard');
+    }
   };
 
   if (loading) {
