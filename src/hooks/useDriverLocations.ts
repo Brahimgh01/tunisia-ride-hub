@@ -33,8 +33,9 @@ export function useDriverLocations() {
     setLoading(true);
     fetchDriverLocations();
 
+    // Subscribe to real-time updates on driver_locations table
     const channel: RealtimeChannel = supabase
-      .channel('public:driver_locations_safe')
+      .channel('driver-locations-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'driver_locations' },

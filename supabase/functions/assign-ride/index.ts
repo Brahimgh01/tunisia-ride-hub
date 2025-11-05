@@ -50,14 +50,25 @@ serve(async (req) => {
     if (!rideData) throw new Error('Ride not found');
     if (rideData.status !== 'pending') throw new Error('Ride is not pending assignment');
 
-    // 2. Get all available drivers with their locations
+    // 2. Get all available drivers with their locations from driver_locations table
     const { data: drivers, error: driverError } = await supabaseAdmin
-      .from('driver_profiles')
-      .select('user_id, last_location')
+      .from('driver_locations')
+      .select(`
+        driver_id,
+        latitude,
+        longitude,
+        is_available,
+        driver_profiles!inner(is_verified, is_available)
+      `)
       .eq('is_available', true)
-      .neq('last_location', null); // Ensure driver has a location
+      .eq('driver_profiles.is_verified', true)
+      .eq('driver_profiles.is_available', true);
 
-    if (driverError) throw new Error(`Driver fetch error: ${driverError.message}`);
+    if (driverError) {
+      console.error('Driver fetch error:', driverError);
+      throw new Error(`Driver fetch error: ${driverError.message}`);
+    }
+    
     if (!drivers || drivers.length === 0) {
       // No drivers available, keep the ride as pending
       console.warn('No available drivers found.');
@@ -67,29 +78,34 @@ serve(async (req) => {
       });
     }
 
+    console.log(`Found ${drivers.length} available verified drivers`);
+
     // 3. Find the closest driver
     let closestDriver = null;
     let minDistance = Infinity;
 
     for (const driver of drivers) {
-      // Type guard for location
-      if (driver.last_location && typeof driver.last_location === 'object' && 'lat' in driver.last_location && 'lng' in driver.last_location) {
-        const { lat, lng } = driver.last_location as { lat: number, lng: number };
-        const distance = haversineDistance(rideData.pickup_lat, rideData.pickup_lng, lat, lng);
-        
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestDriver = driver;
-        }
+      const distance = haversineDistance(
+        rideData.pickup_lat, 
+        rideData.pickup_lng, 
+        driver.latitude, 
+        driver.longitude
+      );
+      
+      console.log(`Driver ${driver.driver_id} is ${distance.toFixed(2)}km away`);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestDriver = driver;
       }
     }
 
     if (!closestDriver) {
-        console.warn('No available drivers with valid locations found.');
-        return new Response(JSON.stringify({ message: 'No available drivers with valid locations found. Ride remains pending.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404
-        });
+      console.warn('No available drivers with valid locations found.');
+      return new Response(JSON.stringify({ message: 'No available drivers with valid locations found. Ride remains pending.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404
+      });
     }
 
 
@@ -98,31 +114,24 @@ serve(async (req) => {
     const { error: updateError } = await supabaseAdmin
       .from('rides')
       .update({ 
-        driver_id: closestDriver.user_id
+        driver_id: closestDriver.driver_id
         // Status remains 'pending' so driver must manually accept
       })
       .eq('id', rideId);
 
     if (updateError) throw new Error(`Ride assignment error: ${updateError.message}`);
     
-    console.log(`Ride ${rideId} assigned to driver ${closestDriver.user_id} at ${minDistance.toFixed(2)}km away`);
+    console.log(`Ride ${rideId} assigned to driver ${closestDriver.driver_id} at ${minDistance.toFixed(2)}km away`);
     
-    // 5. Create notification for the assigned driver
-    const { error: notifError } = await supabaseAdmin
-      .from('notifications')
-      .insert({
-        user_id: closestDriver.user_id,
-        title: 'New Ride Request',
-        message: `You have a new ride request ${minDistance.toFixed(1)}km away`,
-        type: 'ride_request',
-        ride_id: rideId
-      });
-    
-    if (notifError) console.error('Failed to create notification:', notifError);
-    
-    // The driver will be notified via real-time subscription
+    // NOTE: Notification will be created by the database trigger (notify_ride_status_change)
+    // when the ride status changes or when driver accepts
+    // No need to create duplicate notification here
 
-    return new Response(JSON.stringify({ message: 'Ride assigned successfully', driverId: closestDriver.user_id, distance: minDistance }), {
+    return new Response(JSON.stringify({ 
+      message: 'Ride assigned successfully', 
+      driverId: closestDriver.driver_id, 
+      distance: minDistance 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
