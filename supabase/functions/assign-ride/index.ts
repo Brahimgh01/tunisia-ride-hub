@@ -51,23 +51,41 @@ serve(async (req) => {
     if (rideData.status !== 'pending') throw new Error('Ride is not pending assignment');
 
     // 2. Get all available drivers with their locations from driver_locations table
-    const { data: drivers, error: driverError } = await supabaseAdmin
+    const { data: driverLocations, error: locationError } = await supabaseAdmin
       .from('driver_locations')
-      .select(`
-        driver_id,
-        latitude,
-        longitude,
-        is_available,
-        driver_profiles!inner(is_verified, is_available)
-      `)
-      .eq('is_available', true)
-      .eq('driver_profiles.is_verified', true)
-      .eq('driver_profiles.is_available', true);
+      .select('driver_id, latitude, longitude, is_available')
+      .eq('is_available', true);
 
-    if (driverError) {
-      console.error('Driver fetch error:', driverError);
-      throw new Error(`Driver fetch error: ${driverError.message}`);
+    if (locationError) {
+      console.error('Driver location fetch error:', locationError);
+      throw new Error(`Driver location fetch error: ${locationError.message}`);
     }
+
+    if (!driverLocations || driverLocations.length === 0) {
+      console.warn('No available driver locations found.');
+      return new Response(JSON.stringify({ message: 'No available drivers found. Ride remains pending.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404
+      });
+    }
+
+    // Get driver profiles for verification check
+    const driverIds = driverLocations.map(loc => loc.driver_id);
+    const { data: driverProfiles, error: profileError } = await supabaseAdmin
+      .from('driver_profiles')
+      .select('driver_id, is_verified, is_available')
+      .in('driver_id', driverIds)
+      .eq('is_verified', true)
+      .eq('is_available', true);
+
+    if (profileError) {
+      console.error('Driver profile fetch error:', profileError);
+      throw new Error(`Driver profile fetch error: ${profileError.message}`);
+    }
+
+    // Combine locations with verified profiles
+    const verifiedDriverIds = new Set(driverProfiles?.map(p => p.driver_id) || []);
+    const drivers = driverLocations.filter(loc => verifiedDriverIds.has(loc.driver_id));
     
     if (!drivers || drivers.length === 0) {
       // No drivers available, keep the ride as pending
