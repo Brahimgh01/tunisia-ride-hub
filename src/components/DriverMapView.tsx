@@ -19,6 +19,7 @@ interface PendingRide {
   estimated_price?: number;
   ride_type?: string;
   payment_method?: string;
+  driver_id?: string;
 }
 
 interface DriverMapViewProps {
@@ -51,15 +52,30 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       startLocationTracking();
       fetchPendingRides();
       
-      // Subscribe to new ride requests
+      // Subscribe to ride requests - both new inserts AND updates when assigned
       const channel = supabase
         .channel('pending-rides')
+        // Listen for new pending rides
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'rides', filter: 'status=eq.pending' },
           () => {
+            console.log('🆕 New ride request created');
             fetchPendingRides();
             toast.info('🚗 New ride request nearby!');
+          }
+        )
+        // Listen for rides assigned to this driver
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'rides', filter: `driver_id=eq.${driverId}` },
+          (payload) => {
+            console.log('🎯 Ride assigned to you:', payload);
+            fetchPendingRides();
+            toast.success('🎯 New ride assigned to you!', {
+              description: 'Check the map for details',
+              duration: 5000
+            });
           }
         )
         .subscribe();
@@ -68,7 +84,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
         supabase.removeChannel(channel);
       };
     }
-  }, [isOnline]);
+  }, [isOnline, driverId]);
 
   useEffect(() => {
     if (map.current && currentLocation) {
@@ -166,15 +182,24 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   };
 
   const fetchPendingRides = async () => {
+    console.log('📍 Fetching pending rides for driver:', driverId);
     const { data, error } = await supabase
       .from('rides')
       .select('*')
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
-      .limit(10);
+      .limit(20);
 
     if (!error && data) {
-      setPendingRides(data as unknown as PendingRide[]);
+      // Prioritize rides assigned to this driver
+      const assignedToMe = data.filter(r => r.driver_id === driverId);
+      const unassigned = data.filter(r => !r.driver_id);
+      const sortedRides = [...assignedToMe, ...unassigned];
+      
+      console.log(`✅ Found ${assignedToMe.length} assigned rides, ${unassigned.length} unassigned rides`);
+      setPendingRides(sortedRides as unknown as PendingRide[]);
+    } else if (error) {
+      console.error('❌ Error fetching rides:', error);
     }
   };
 
@@ -215,20 +240,23 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
 
     // Add markers for each pending ride
     pendingRides.forEach((ride) => {
+      const isAssignedToMe = ride.driver_id === driverId;
+      
       const el = document.createElement('div');
       el.className = 'ride-marker';
       el.innerHTML = `
         <div style="
-          background: #10b981;
+          background: ${isAssignedToMe ? '#f59e0b' : '#10b981'};
           color: white;
           padding: 8px 12px;
           border-radius: 20px;
           font-weight: bold;
           font-size: 14px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
           cursor: pointer;
           white-space: nowrap;
-        ">📍 ${ride.estimated_price ? `${ride.estimated_price} TND` : 'New'}</div>
+          animation: ${isAssignedToMe ? 'pulse 2s infinite' : 'none'};
+        ">${isAssignedToMe ? '🎯' : '📍'} ${ride.estimated_price ? `${ride.estimated_price} TND` : 'New'}</div>
       `;
       
       el.onclick = () => setSelectedRide(ride);
