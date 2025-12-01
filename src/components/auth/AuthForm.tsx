@@ -42,13 +42,18 @@ const translations = {
     signUpSuccess: 'Account created successfully',
     error: 'Error',
     fillAllFields: 'Please fill all required fields',
+    forgotPassword: 'Forgot Password?',
+    enterEmail: 'Enter Email',
+    enterEmailFirst: 'Please enter your email address first.',
+    passwordReset: 'Password Reset',
+    checkEmail: 'Check your email for password reset instructions.',
   },
   fr: {
     welcome: 'Bienvenue sur TuniRide',
     subtitle: 'Votre compagnon de route de confiance en Tunisie',
     login: 'Connexion',
     register: 'Inscription',
-    email: 'Email',
+    email: 'E-mail',
     password: 'Mot de passe',
     fullName: 'Nom complet',
     phone: 'Numéro de téléphone',
@@ -63,17 +68,22 @@ const translations = {
     selectCity: 'Sélectionnez votre ville',
     showPassword: 'Afficher le mot de passe',
     hidePassword: 'Masquer le mot de passe',
-    signingIn: 'Connexion...',
+    signingIn: 'Connexion en cours...',
     creatingAccount: 'Création du compte...',
     success: 'Succès',
     loginSuccess: 'Connexion réussie',
     signUpSuccess: 'Compte créé avec succès',
     error: 'Erreur',
-    fillAllFields: 'Veuillez remplir tous les champs',
+    fillAllFields: 'Veuillez remplir tous les champs obligatoires',
+    forgotPassword: 'Mot de passe oublié ?',
+    enterEmail: 'Entrez votre e-mail',
+    enterEmailFirst: 'Veuillez d\'abord entrer votre adresse e-mail.',
+    passwordReset: 'Réinitialisation du mot de passe',
+    checkEmail: 'Consultez votre e-mail pour les instructions de réinitialisation.',
   },
   ar: {
     welcome: 'مرحباً بك في تونيرايد',
-    subtitle: 'رفيقك الموثوق للسفر عبر تونس',
+    subtitle: 'رفيقك الموثوق للتنقل في تونس',
     login: 'تسجيل الدخول',
     register: 'إنشاء حساب',
     email: 'البريد الإلكتروني',
@@ -84,7 +94,7 @@ const translations = {
     customer: 'عميل',
     driver: 'سائق',
     customerDesc: 'احجز رحلات في جميع أنحاء تونس',
-    driverDesc: 'اربح المال من خلال القيادة',
+    driverDesc: 'اكسب المال من خلال القيادة',
     loginBtn: 'دخول',
     registerBtn: 'إنشاء حساب',
     city: 'المدينة',
@@ -98,6 +108,11 @@ const translations = {
     signUpSuccess: 'تم إنشاء الحساب بنجاح',
     error: 'خطأ',
     fillAllFields: 'يرجى ملء جميع الحقول المطلوبة',
+    forgotPassword: 'نسيت كلمة المرور؟',
+    enterEmail: 'أدخل بريدك الإلكتروني',
+    enterEmailFirst: 'يرجى إدخال عنوان بريدك الإلكتروني أولاً.',
+    passwordReset: 'إعادة تعيين كلمة المرور',
+    checkEmail: 'تحقق من بريدك الإلكتروني للحصول على تعليمات إعادة التعيين.',
   }
 };
 
@@ -245,14 +260,14 @@ export function AuthForm({ language }: { language: Language }) {
         });
       } else {
         toast({
-          title: 'Password Reset',
-          description: 'Check your email for password reset instructions.',
+          title: t.passwordReset,
+          description: t.checkEmail,
         });
       }
     } catch (error) {
       toast({
         title: t.error,
-        description: 'Failed to send password reset email.',
+        description: t.enterEmailFirst,
         variant: 'destructive',
       });
     }
@@ -346,14 +361,14 @@ export function AuthForm({ language }: { language: Language }) {
                         handlePasswordReset(emailInput.value);
                       } else {
                         toast({
-                          title: "Enter Email",
-                          description: "Please enter your email address first.",
+                          title: t.enterEmail,
+                          description: t.enterEmailFirst,
                           variant: "destructive",
                         });
                       }
                     }}
                   >
-                    Forgot Password?
+                    {t.forgotPassword}
                   </Button>
                 </div>
               </form>
