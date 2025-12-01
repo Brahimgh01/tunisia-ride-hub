@@ -81,7 +81,12 @@ export default function DriverDashboard() {
       active: 'نشط',
       expired: 'منتهي',
       daysLeft: 'أيام متبقية',
-      nearbyRequests: 'الطلبات القريبة'
+      nearbyRequests: 'الطلبات القريبة',
+      verified: 'موثق',
+      allTime: 'كل الوقت',
+      today: 'اليوم',
+      subscriptionRequired: 'الاشتراك مطلوب',
+      renewSubscription: 'جدد اشتراكك لقبول الرحلات.'
     },
     en: {
       title: 'Driver Dashboard',
@@ -104,7 +109,12 @@ export default function DriverDashboard() {
       active: 'Active',
       expired: 'Expired',
       daysLeft: 'days left',
-      nearbyRequests: 'Nearby Requests'
+      nearbyRequests: 'Nearby Requests',
+      verified: 'Verified',
+      allTime: 'All time',
+      today: 'Today',
+      subscriptionRequired: 'Subscription Required',
+      renewSubscription: 'Renew your subscription to accept rides.'
     },
     fr: {
       title: 'Tableau de bord Chauffeur',
@@ -127,7 +137,12 @@ export default function DriverDashboard() {
       active: 'Actif',
       expired: 'Expiré',
       daysLeft: 'jours restants',
-      nearbyRequests: 'Demandes à proximité'
+      nearbyRequests: 'Demandes à proximité',
+      verified: 'Vérifié',
+      allTime: 'Total',
+      today: 'Aujourd\'hui',
+      subscriptionRequired: 'Abonnement requis',
+      renewSubscription: 'Renouvelez votre abonnement pour accepter des courses.'
     }
   }[language];
 
@@ -432,7 +447,7 @@ export default function DriverDashboard() {
               </Badge>
               {isVerified && (
                 <Badge variant="outline" className="text-sm">
-                  <CheckCircle className="h-3 w-3 mr-1" /> Verified
+                  <CheckCircle className="h-3 w-3 mr-1" /> {t?.verified}
                 </Badge>
               )}
             </div>
@@ -455,8 +470,8 @@ export default function DriverDashboard() {
                 </div>
                 {!subscription.isActive && (
                   <div className="text-xs mt-2 p-2 bg-red-500/10 rounded border border-red-500/20">
-                    <p className="text-red-600 dark:text-red-400 font-medium">⚠️ Subscription Required</p>
-                    <p className="text-muted-foreground mt-1">Renew your subscription to accept rides.</p>
+                    <p className="text-red-600 dark:text-red-400 font-medium">⚠️ {t?.subscriptionRequired}</p>
+                    <p className="text-muted-foreground mt-1">{t?.renewSubscription}</p>
                   </div>
                 )}
               </CardContent>
@@ -477,7 +492,7 @@ export default function DriverDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stats.totalRides}</div>
-              <p className="text-xs text-muted-foreground mt-1">All time</p>
+              <p className="text-xs text-muted-foreground mt-1">{t?.allTime}</p>
             </CardContent>
           </Card>
 
@@ -485,14 +500,14 @@ export default function DriverDashboard() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {t.todayRides}
+                  {t?.todayRides}
                 </CardTitle>
                 <Clock className="h-5 w-5 text-green-500" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stats.todayRides}</div>
-              <p className="text-xs text-muted-foreground mt-1">Today</p>
+              <p className="text-xs text-muted-foreground mt-1">{t?.today}</p>
             </CardContent>
           </Card>
 

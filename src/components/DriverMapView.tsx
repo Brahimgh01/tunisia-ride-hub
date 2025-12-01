@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Navigation, CheckCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface PendingRide {
   id: string;
@@ -27,7 +28,64 @@ interface DriverMapViewProps {
   driverId: string;
 }
 
+const translations = {
+  en: {
+    youAreOffline: 'You are offline',
+    goOnline: 'Go online to see ride requests',
+    newRideRequest: 'New Ride Request',
+    pickup: 'Pickup',
+    dropoff: 'Dropoff',
+    acceptRide: 'Accept Ride',
+    decline: 'Decline',
+    ridesNearby: 'ride(s) nearby',
+    loadingMap: 'Loading map...',
+    newRideNearby: 'New ride request nearby!',
+    rideAssigned: 'New ride assigned to you!',
+    checkMap: 'Check the map for details',
+    locationError: 'Could not get your location',
+    acceptSuccess: 'Ride accepted! Customer has been notified.',
+    acceptError: 'Failed to accept ride',
+  },
+  fr: {
+    youAreOffline: 'Vous êtes hors ligne',
+    goOnline: 'Passez en ligne pour voir les demandes',
+    newRideRequest: 'Nouvelle demande de course',
+    pickup: 'Prise en charge',
+    dropoff: 'Dépose',
+    acceptRide: 'Accepter la course',
+    decline: 'Refuser',
+    ridesNearby: 'course(s) à proximité',
+    loadingMap: 'Chargement de la carte...',
+    newRideNearby: 'Nouvelle demande de course à proximité !',
+    rideAssigned: 'Nouvelle course attribuée !',
+    checkMap: 'Consultez la carte pour les détails',
+    locationError: 'Impossible d\'obtenir votre position',
+    acceptSuccess: 'Course acceptée ! Le client a été notifié.',
+    acceptError: 'Échec de l\'acceptation',
+  },
+  ar: {
+    youAreOffline: 'أنت غير متصل',
+    goOnline: 'اتصل لرؤية طلبات الرحلات',
+    newRideRequest: 'طلب رحلة جديد',
+    pickup: 'نقطة الانطلاق',
+    dropoff: 'نقطة الوصول',
+    acceptRide: 'قبول الرحلة',
+    decline: 'رفض',
+    ridesNearby: 'رحلة(رحلات) قريبة',
+    loadingMap: 'جاري تحميل الخريطة...',
+    newRideNearby: 'طلب رحلة جديد بالقرب منك!',
+    rideAssigned: 'تم تعيين رحلة جديدة لك!',
+    checkMap: 'تحقق من الخريطة للتفاصيل',
+    locationError: 'تعذر الحصول على موقعك',
+    acceptSuccess: 'تم قبول الرحلة! تم إخطار العميل.',
+    acceptError: 'فشل قبول الرحلة',
+  }
+};
+
 export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps) {
+  const { language } = useAuth();
+  const t = translations[language as keyof typeof translations] || translations.en;
+  
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const driverMarker = useRef<mapboxgl.Marker | null>(null);
@@ -62,7 +120,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
           () => {
             console.log('🆕 New ride request created');
             fetchPendingRides();
-            toast.info('🚗 New ride request nearby!');
+            toast.info(`🚗 ${t.newRideNearby}`);
           }
         )
         // Listen for rides assigned to this driver
@@ -72,8 +130,8 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
           (payload) => {
             console.log('🎯 Ride assigned to you:', payload);
             fetchPendingRides();
-            toast.success('🎯 New ride assigned to you!', {
-              description: 'Check the map for details',
+            toast.success(`🎯 ${t.rideAssigned}`, {
+              description: t.checkMap,
               duration: 5000
             });
           }
@@ -84,7 +142,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
         supabase.removeChannel(channel);
       };
     }
-  }, [isOnline, driverId]);
+  }, [isOnline, driverId, t]);
 
   useEffect(() => {
     if (map.current && currentLocation) {
@@ -147,7 +205,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
         },
         (error) => {
           console.error('Location error:', error);
-          toast.error('Could not get your location');
+          toast.error(t.locationError);
         },
         {
           enableHighAccuracy: true,
@@ -276,9 +334,9 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       .eq('id', rideId);
 
     if (error) {
-      toast.error('Failed to accept ride');
+      toast.error(t.acceptError);
     } else {
-      toast.success('Ride accepted! Customer has been notified.');
+      toast.success(t.acceptSuccess);
       setSelectedRide(null);
       fetchPendingRides();
     }
@@ -290,7 +348,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
         <div className="absolute inset-0 bg-muted flex items-center justify-center z-10 rounded-lg">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading map...</p>
+            <p className="text-muted-foreground">{t.loadingMap}</p>
           </div>
         </div>
       )}
@@ -301,8 +359,8 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-lg">
           <Card>
             <CardContent className="pt-6 text-center">
-              <p className="text-lg font-semibold mb-2">You are offline</p>
-              <p className="text-sm text-muted-foreground">Go online to see ride requests</p>
+              <p className="text-lg font-semibold mb-2">{t.youAreOffline}</p>
+              <p className="text-sm text-muted-foreground">{t.goOnline}</p>
             </CardContent>
           </Card>
         </div>
@@ -313,7 +371,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="font-bold text-lg mb-1">New Ride Request</h3>
+                <h3 className="font-bold text-lg mb-1">{t.newRideRequest}</h3>
                 {selectedRide.estimated_price && (
                   <Badge className="text-base">{selectedRide.estimated_price} TND</Badge>
                 )}
@@ -331,14 +389,14 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
               <div className="flex items-start gap-2">
                 <MapPin className="h-5 w-5 text-green-500 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium">Pickup</p>
+                  <p className="text-sm font-medium">{t.pickup}</p>
                   <p className="text-sm text-muted-foreground">{selectedRide.pickup_location}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <MapPin className="h-5 w-5 text-red-500 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium">Dropoff</p>
+                  <p className="text-sm font-medium">{t.dropoff}</p>
                   <p className="text-sm text-muted-foreground">{selectedRide.dropoff_location}</p>
                 </div>
               </div>
@@ -350,13 +408,13 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
                 className="flex-1"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Accept Ride
+                {t.acceptRide}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setSelectedRide(null)}
               >
-                Decline
+                {t.decline}
               </Button>
             </div>
           </CardContent>
@@ -366,7 +424,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       {isOnline && pendingRides.length > 0 && !selectedRide && (
         <div className="absolute top-4 left-4 z-10">
           <Badge className="text-base px-4 py-2">
-            {pendingRides.length} ride{pendingRides.length !== 1 ? 's' : ''} nearby
+            {pendingRides.length} {t.ridesNearby}
           </Badge>
         </div>
       )}
