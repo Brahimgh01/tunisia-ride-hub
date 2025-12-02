@@ -1,4 +1,7 @@
 
+export type Language = 'en' | 'fr' | 'ar';
+export type UserRole = 'customer' | 'driver' | 'admin';
+
 export interface Profile {
   user_id: string;
   full_name: string;

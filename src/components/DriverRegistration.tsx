@@ -10,13 +10,186 @@ import { toast } from 'sonner';
 import { Upload, Check, Camera, Car, CreditCard, FileText, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import type { Language } from '@/lib/types';
+
+const translations = {
+  en: {
+    vehicleInfo: 'Vehicle Information',
+    identityVerification: 'Identity Verification',
+    driverDocuments: 'Driver Documents',
+    reviewSubmit: 'Review & Submit',
+    tellUsAboutVehicle: 'Tell us about your vehicle',
+    uploadNationalId: 'Upload your national ID card (both sides)',
+    uploadLicenseReg: 'Upload your license and vehicle registration',
+    reviewAndSubmit: 'Review your information and submit',
+    vehicleType: 'Vehicle Type',
+    selectVehicleType: 'Select vehicle type',
+    taxi: 'Taxi',
+    premiumCar: 'Premium Car',
+    carpoolingCar: 'Carpooling Car',
+    motorcycle: 'Motorcycle',
+    vehicleModel: 'Vehicle Model',
+    vehicleModelPlaceholder: 'e.g., Toyota Camry 2020',
+    vehicleColor: 'Vehicle Color',
+    vehicleColorPlaceholder: 'e.g., Black',
+    licensePlate: 'License Plate Number',
+    licensePlatePlaceholder: 'e.g., 123-TUN-456',
+    nationalIdFront: 'National ID (Front)',
+    nationalIdBack: 'National ID (Back)',
+    clickToUploadFront: 'Click to upload front side',
+    clickToUploadBack: 'Click to upload back side',
+    drivingLicense: 'Driving License',
+    uploadLicensePhoto: 'Upload clear photo or PDF of your driving license',
+    vehicleRegistration: 'Vehicle Registration (Carte Grise)',
+    uploadVehicleReg: 'Upload vehicle registration document',
+    carPhoto: 'Car Photo',
+    uploadCarPhoto: 'Upload a clear photo of your car',
+    next: 'Next',
+    back: 'Back',
+    submit: 'Submit Registration',
+    completeAllSteps: 'Please complete all steps and upload all required documents.',
+    uploadingDocs: 'Uploading documents...',
+    creatingProfile: 'Creating driver profile...',
+    registrationComplete: 'Registration complete! You have 1 month free trial. You can now accept rides!',
+    stepVehicleInfo: 'Vehicle Info',
+    stepIdDocuments: 'ID Documents',
+    stepLicenseReg: 'License & Registration',
+    stepReview: 'Review',
+    stepSubscription: 'Subscription',
+    reviewYourInfo: 'Review your information before submitting',
+    yourVehicle: 'Your Vehicle',
+    uploadedDocuments: 'Uploaded Documents',
+    idCardUploaded: 'ID Card (Front & Back)',
+    drivingLicenseUploaded: 'Driving License',
+    vehicleRegUploaded: 'Vehicle Registration',
+    carPhotoUploaded: 'Car Photo',
+    subscriptionInfo: 'Subscription Information',
+    freeTrialTitle: '1 Month Free Trial',
+    freeTrialDesc: 'Start accepting rides immediately with no fees for your first month',
+    afterTrial: 'After trial: 50 TND/month',
+    submitting: 'Submitting...',
+  },
+  fr: {
+    vehicleInfo: 'Informations sur le véhicule',
+    identityVerification: 'Vérification d\'identité',
+    driverDocuments: 'Documents du chauffeur',
+    reviewSubmit: 'Réviser et soumettre',
+    tellUsAboutVehicle: 'Parlez-nous de votre véhicule',
+    uploadNationalId: 'Téléchargez votre carte d\'identité nationale (recto verso)',
+    uploadLicenseReg: 'Téléchargez votre permis et carte grise',
+    reviewAndSubmit: 'Vérifiez vos informations et soumettez',
+    vehicleType: 'Type de véhicule',
+    selectVehicleType: 'Sélectionnez le type de véhicule',
+    taxi: 'Taxi',
+    premiumCar: 'Voiture Premium',
+    carpoolingCar: 'Voiture de covoiturage',
+    motorcycle: 'Moto',
+    vehicleModel: 'Modèle du véhicule',
+    vehicleModelPlaceholder: 'ex: Toyota Camry 2020',
+    vehicleColor: 'Couleur du véhicule',
+    vehicleColorPlaceholder: 'ex: Noir',
+    licensePlate: 'Numéro de plaque',
+    licensePlatePlaceholder: 'ex: 123-TUN-456',
+    nationalIdFront: 'Carte d\'identité (Recto)',
+    nationalIdBack: 'Carte d\'identité (Verso)',
+    clickToUploadFront: 'Cliquez pour télécharger le recto',
+    clickToUploadBack: 'Cliquez pour télécharger le verso',
+    drivingLicense: 'Permis de conduire',
+    uploadLicensePhoto: 'Téléchargez une photo claire ou PDF de votre permis',
+    vehicleRegistration: 'Carte Grise',
+    uploadVehicleReg: 'Téléchargez le document de carte grise',
+    carPhoto: 'Photo du véhicule',
+    uploadCarPhoto: 'Téléchargez une photo claire de votre véhicule',
+    next: 'Suivant',
+    back: 'Retour',
+    submit: 'Soumettre l\'inscription',
+    completeAllSteps: 'Veuillez compléter toutes les étapes et télécharger tous les documents requis.',
+    uploadingDocs: 'Téléchargement des documents...',
+    creatingProfile: 'Création du profil chauffeur...',
+    registrationComplete: 'Inscription terminée! Vous avez 1 mois d\'essai gratuit. Vous pouvez maintenant accepter des courses!',
+    stepVehicleInfo: 'Véhicule',
+    stepIdDocuments: 'Documents ID',
+    stepLicenseReg: 'Permis & Carte Grise',
+    stepReview: 'Révision',
+    stepSubscription: 'Abonnement',
+    reviewYourInfo: 'Vérifiez vos informations avant de soumettre',
+    yourVehicle: 'Votre véhicule',
+    uploadedDocuments: 'Documents téléchargés',
+    idCardUploaded: 'Carte d\'identité (Recto & Verso)',
+    drivingLicenseUploaded: 'Permis de conduire',
+    vehicleRegUploaded: 'Carte Grise',
+    carPhotoUploaded: 'Photo du véhicule',
+    subscriptionInfo: 'Informations d\'abonnement',
+    freeTrialTitle: '1 Mois d\'essai gratuit',
+    freeTrialDesc: 'Commencez à accepter des courses immédiatement sans frais pendant votre premier mois',
+    afterTrial: 'Après l\'essai: 50 TND/mois',
+    submitting: 'Soumission...',
+  },
+  ar: {
+    vehicleInfo: 'معلومات المركبة',
+    identityVerification: 'التحقق من الهوية',
+    driverDocuments: 'وثائق السائق',
+    reviewSubmit: 'مراجعة وإرسال',
+    tellUsAboutVehicle: 'أخبرنا عن مركبتك',
+    uploadNationalId: 'قم بتحميل بطاقة الهوية الوطنية (الوجهين)',
+    uploadLicenseReg: 'قم بتحميل رخصة القيادة والبطاقة الرمادية',
+    reviewAndSubmit: 'راجع معلوماتك وأرسل',
+    vehicleType: 'نوع المركبة',
+    selectVehicleType: 'اختر نوع المركبة',
+    taxi: 'تاكسي',
+    premiumCar: 'سيارة فاخرة',
+    carpoolingCar: 'سيارة مشاركة',
+    motorcycle: 'دراجة نارية',
+    vehicleModel: 'طراز المركبة',
+    vehicleModelPlaceholder: 'مثال: Toyota Camry 2020',
+    vehicleColor: 'لون المركبة',
+    vehicleColorPlaceholder: 'مثال: أسود',
+    licensePlate: 'رقم لوحة الترخيص',
+    licensePlatePlaceholder: 'مثال: 123-TUN-456',
+    nationalIdFront: 'بطاقة الهوية (الأمام)',
+    nationalIdBack: 'بطاقة الهوية (الخلف)',
+    clickToUploadFront: 'انقر لتحميل الوجه الأمامي',
+    clickToUploadBack: 'انقر لتحميل الوجه الخلفي',
+    drivingLicense: 'رخصة القيادة',
+    uploadLicensePhoto: 'قم بتحميل صورة واضحة أو PDF لرخصة القيادة',
+    vehicleRegistration: 'البطاقة الرمادية',
+    uploadVehicleReg: 'قم بتحميل وثيقة البطاقة الرمادية',
+    carPhoto: 'صورة السيارة',
+    uploadCarPhoto: 'قم بتحميل صورة واضحة لسيارتك',
+    next: 'التالي',
+    back: 'رجوع',
+    submit: 'إرسال التسجيل',
+    completeAllSteps: 'يرجى إكمال جميع الخطوات وتحميل جميع المستندات المطلوبة.',
+    uploadingDocs: 'جاري تحميل المستندات...',
+    creatingProfile: 'جاري إنشاء ملف السائق...',
+    registrationComplete: 'اكتمل التسجيل! لديك شهر واحد تجريبي مجاني. يمكنك الآن قبول الرحلات!',
+    stepVehicleInfo: 'المركبة',
+    stepIdDocuments: 'الهوية',
+    stepLicenseReg: 'الرخصة والبطاقة',
+    stepReview: 'مراجعة',
+    stepSubscription: 'الاشتراك',
+    reviewYourInfo: 'راجع معلوماتك قبل الإرسال',
+    yourVehicle: 'مركبتك',
+    uploadedDocuments: 'المستندات المحملة',
+    idCardUploaded: 'بطاقة الهوية (الوجهين)',
+    drivingLicenseUploaded: 'رخصة القيادة',
+    vehicleRegUploaded: 'البطاقة الرمادية',
+    carPhotoUploaded: 'صورة السيارة',
+    subscriptionInfo: 'معلومات الاشتراك',
+    freeTrialTitle: 'شهر واحد تجريبي مجاني',
+    freeTrialDesc: 'ابدأ بقبول الرحلات فوراً بدون رسوم خلال شهرك الأول',
+    afterTrial: 'بعد التجربة: 50 دينار/شهر',
+    submitting: 'جاري الإرسال...',
+  },
+};
 
 interface DriverRegistrationProps {
   onRegistrationComplete: () => void;
 }
 
 export default function DriverRegistration({ onRegistrationComplete }: DriverRegistrationProps) {
-  const { user } = useAuth();
+  const { user, language } = useAuth();
+  const t = translations[language] || translations.en;
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const totalSteps = 5;
@@ -66,13 +239,13 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
 
   const handleSubmit = async () => {
     if (!user || !idFrontFile || !idBackFile || !licenseFile || !vehicleRegFile || !carPhotoFile || !vehicleType) {
-      toast.error('Please complete all steps and upload all required documents.');
+      toast.error(t.completeAllSteps);
       return;
     }
 
     setLoading(true);
     
-    toast.loading('Uploading documents...');
+    toast.loading(t.uploadingDocs);
     
     // Upload all documents
     const [idFrontUrl, idBackUrl, licenseUrl, vehicleRegUrl, carPhotoUrl] = await Promise.all([
@@ -90,7 +263,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
     }
 
     toast.dismiss();
-    toast.loading('Creating driver profile...');
+    toast.loading(t.creatingProfile);
 
     // Upsert driver profile (insert or update if exists)
     const { error: profileError } = await supabase
@@ -169,7 +342,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
       console.error('Error verifying driver:', verifyError);
     }
 
-    toast.success('✅ Registration complete! You have 1 month free trial. You can now accept rides!');
+    toast.success('✅ ' + t.registrationComplete);
     setLoading(false);
     onRegistrationComplete();
   };
@@ -196,27 +369,27 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
             ))}
           </div>
           <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Vehicle Info</span>
-            <span>ID Documents</span>
-            <span>License & Registration</span>
-            <span>Review</span>
-            <span>Subscription</span>
+            <span>{t.stepVehicleInfo}</span>
+            <span>{t.stepIdDocuments}</span>
+            <span>{t.stepLicenseReg}</span>
+            <span>{t.stepReview}</span>
+            <span>{t.stepSubscription}</span>
           </div>
         </div>
 
         <Card className="shadow-2xl">
           <CardHeader>
             <CardTitle className="text-3xl flex items-center gap-2">
-              {step === 1 && <><Car className="h-7 w-7" /> Vehicle Information</>}
-              {step === 2 && <><Shield className="h-7 w-7" /> Identity Verification</>}
-              {step === 3 && <><FileText className="h-7 w-7" /> Driver Documents</>}
-              {step === 4 && <><Check className="h-7 w-7" /> Review & Submit</>}
+              {step === 1 && <><Car className="h-7 w-7" /> {t.vehicleInfo}</>}
+              {step === 2 && <><Shield className="h-7 w-7" /> {t.identityVerification}</>}
+              {step === 3 && <><FileText className="h-7 w-7" /> {t.driverDocuments}</>}
+              {step === 4 && <><Check className="h-7 w-7" /> {t.reviewSubmit}</>}
             </CardTitle>
             <CardDescription>
-              {step === 1 && 'Tell us about your vehicle'}
-              {step === 2 && 'Upload your national ID card (both sides)'}
-              {step === 3 && 'Upload your license and vehicle registration'}
-              {step === 4 && 'Review your information and submit'}
+              {step === 1 && t.tellUsAboutVehicle}
+              {step === 2 && t.uploadNationalId}
+              {step === 3 && t.uploadLicenseReg}
+              {step === 4 && t.reviewAndSubmit}
             </CardDescription>
           </CardHeader>
           
@@ -226,49 +399,49 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
               <div className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="vehicle-type">Vehicle Type *</Label>
+                    <Label htmlFor="vehicle-type">{t.vehicleType} *</Label>
                     <Select onValueChange={setVehicleType} value={vehicleType} required>
                       <SelectTrigger id="vehicle-type">
-                        <SelectValue placeholder="Select vehicle type" />
+                        <SelectValue placeholder={t.selectVehicleType} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="taxi">🚕 Taxi</SelectItem>
-                        <SelectItem value="premium">👑 Premium Car</SelectItem>
-                        <SelectItem value="carpooling">👥 Carpooling Car</SelectItem>
-                        <SelectItem value="motorcycle">🏍️ Motorcycle</SelectItem>
+                        <SelectItem value="taxi">🚕 {t.taxi}</SelectItem>
+                        <SelectItem value="premium">👑 {t.premiumCar}</SelectItem>
+                        <SelectItem value="carpooling">👥 {t.carpoolingCar}</SelectItem>
+                        <SelectItem value="motorcycle">🏍️ {t.motorcycle}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="vehicleModel">Vehicle Model *</Label>
+                    <Label htmlFor="vehicleModel">{t.vehicleModel} *</Label>
                     <Input 
                       id="vehicleModel" 
                       value={vehicleModel}
                       onChange={(e) => setVehicleModel(e.target.value)}
-                      placeholder="e.g., Toyota Camry 2020" 
+                      placeholder={t.vehicleModelPlaceholder} 
                       required 
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="vehicleColor">Vehicle Color *</Label>
+                    <Label htmlFor="vehicleColor">{t.vehicleColor} *</Label>
                     <Input 
                       id="vehicleColor" 
                       value={vehicleColor}
                       onChange={(e) => setVehicleColor(e.target.value)}
-                      placeholder="e.g., Black" 
+                      placeholder={t.vehicleColorPlaceholder} 
                       required 
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="licensePlate">License Plate Number *</Label>
+                    <Label htmlFor="licensePlate">{t.licensePlate} *</Label>
                     <Input 
                       id="licensePlate" 
                       value={licensePlate}
                       onChange={(e) => setLicensePlate(e.target.value)}
-                      placeholder="e.g., 123-TUN-456" 
+                      placeholder={t.licensePlatePlaceholder} 
                       required 
                     />
                   </div>
@@ -282,7 +455,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="id-front" className="flex items-center gap-2">
-                      <Camera className="h-4 w-4" /> National ID (Front) *
+                      <Camera className="h-4 w-4" /> {t.nationalIdFront} *
                     </Label>
                     <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
                       <input
@@ -301,7 +474,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                         ) : (
                           <div>
                             <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">Click to upload front side</p>
+                            <p className="text-sm text-muted-foreground">{t.clickToUploadFront}</p>
                           </div>
                         )}
                       </label>
@@ -310,7 +483,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
 
                   <div className="space-y-2">
                     <Label htmlFor="id-back" className="flex items-center gap-2">
-                      <Camera className="h-4 w-4" /> National ID (Back) *
+                      <Camera className="h-4 w-4" /> {t.nationalIdBack} *
                     </Label>
                       <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
                       <input
@@ -329,7 +502,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                         ) : (
                           <div>
                             <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">Click to upload back side</p>
+                            <p className="text-sm text-muted-foreground">{t.clickToUploadBack}</p>
                           </div>
                         )}
                       </label>
@@ -339,7 +512,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
 
                 <div className="space-y-2">
                   <Label htmlFor="license-doc" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> Driving License *
+                    <FileText className="h-4 w-4" /> {t.drivingLicense} *
                   </Label>
                     <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
                     <input
@@ -358,7 +531,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                       ) : (
                         <div>
                           <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">Upload clear photo or PDF of your driving license</p>
+                          <p className="text-sm text-muted-foreground">{t.uploadLicensePhoto}</p>
                         </div>
                       )}
                     </label>
@@ -373,7 +546,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="vehicle-reg" className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" /> Vehicle Registration (Carte Grise) *
+                      <FileText className="h-4 w-4" /> {t.vehicleRegistration} *
                     </Label>
                     <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
                       <input
@@ -392,7 +565,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                         ) : (
                           <div>
                             <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">Upload vehicle registration document</p>
+                            <p className="text-sm text-muted-foreground">{t.uploadVehicleReg}</p>
                           </div>
                         )}
                       </label>
@@ -401,7 +574,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
 
                   <div className="space-y-2">
                     <Label htmlFor="car-photo" className="flex items-center gap-2">
-                      <Camera className="h-4 w-4" /> Car Photo *
+                      <Camera className="h-4 w-4" /> {t.carPhoto} *
                     </Label>
                     <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
                       <input
@@ -420,7 +593,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                         ) : (
                           <div>
                             <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">Upload a clear photo of your car</p>
+                            <p className="text-sm text-muted-foreground">{t.uploadCarPhoto}</p>
                           </div>
                         )}
                       </label>
@@ -436,13 +609,13 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                 <Card className="bg-muted/50">
                   <CardContent className="pt-6">
                     <h3 className="font-semibold mb-4 flex items-center gap-2">
-                      <Car className="h-5 w-5" /> Vehicle Information
+                      <Car className="h-5 w-5" /> {t.yourVehicle}
                     </h3>
                     <div className="grid md:grid-cols-2 gap-4 text-sm">
-                      <div><span className="text-muted-foreground">Type:</span> <Badge>{vehicleType}</Badge></div>
-                      <div><span className="text-muted-foreground">Model:</span> {vehicleModel}</div>
-                      <div><span className="text-muted-foreground">Color:</span> {vehicleColor}</div>
-                      <div><span className="text-muted-foreground">Plate:</span> {licensePlate}</div>
+                      <div><span className="text-muted-foreground">{t.vehicleType}:</span> <Badge>{vehicleType}</Badge></div>
+                      <div><span className="text-muted-foreground">{t.vehicleModel}:</span> {vehicleModel}</div>
+                      <div><span className="text-muted-foreground">{t.vehicleColor}:</span> {vehicleColor}</div>
+                      <div><span className="text-muted-foreground">{t.licensePlate}:</span> {licensePlate}</div>
                     </div>
                   </CardContent>
                 </Card>
@@ -450,34 +623,24 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                 <Card className="bg-muted/50">
                   <CardContent className="pt-6">
                     <h3 className="font-semibold mb-4 flex items-center gap-2">
-                      <FileText className="h-5 w-5" /> Uploaded Documents
+                      <FileText className="h-5 w-5" /> {t.uploadedDocuments}
                     </h3>
                     <div className="grid md:grid-cols-2 gap-3 text-sm">
                       <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-600" /> ID Card (Front)
+                        <Check className="h-4 w-4 text-green-600" /> {t.idCardUploaded}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-600" /> ID Card (Back)
+                        <Check className="h-4 w-4 text-green-600" /> {t.drivingLicenseUploaded}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-600" /> Driving License
+                        <Check className="h-4 w-4 text-green-600" /> {t.vehicleRegUploaded}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-600" /> Vehicle Registration
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-600" /> Car Photo
+                        <Check className="h-4 w-4 text-green-600" /> {t.carPhotoUploaded}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <p className="text-sm text-blue-900 dark:text-blue-100">
-                    <strong>Note:</strong> Your registration will be reviewed by our team. This usually takes 24-48 hours. 
-                    You'll receive a notification once approved and can start accepting rides!
-                  </p>
-                </div>
               </div>
             )}
 
@@ -487,19 +650,13 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                 <Card className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
                   <CardContent className="pt-6">
                     <h3 className="font-semibold mb-4 flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-green-600" /> Subscription & Free Trial
+                      <CreditCard className="h-5 w-5 text-green-600" /> {t.subscriptionInfo}
                     </h3>
                     <div className="text-lg mb-2">
-                      <span className="font-bold text-green-700 dark:text-green-300">You get 1 month free trial!</span>
+                      <span className="font-bold text-green-700 dark:text-green-300">{t.freeTrialTitle}</span>
                     </div>
-                    <ul className="list-disc pl-6 text-sm text-muted-foreground mb-4">
-                      <li>No payment required for the first month.</li>
-                      <li>After the trial, subscription is 50 TND/month.</li>
-                      <li>You can start accepting rides immediately after approval.</li>
-                    </ul>
-                    <div className="text-blue-900 dark:text-blue-100 text-sm">
-                      By submitting, you agree to the driver terms and subscription policy.
-                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">{t.freeTrialDesc}</p>
+                    <p className="text-sm text-muted-foreground">{t.afterTrial}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -511,7 +668,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
             <div className="flex justify-between pt-4">
               {step > 1 && (
                 <Button variant="outline" onClick={() => setStep(step - 1)} disabled={loading}>
-                  Previous
+                  {t.back}
                 </Button>
               )}
               <div className="ml-auto">
@@ -524,11 +681,11 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                       (step === 3 && !canSubmit)
                     }
                   >
-                    Next
+                    {t.next}
                   </Button>
                 ) : (
                   <Button onClick={handleSubmit} disabled={loading} className="min-w-32">
-                    {loading ? 'Submitting...' : 'Submit Registration'}
+                    {loading ? t.submitting : t.submit}
                   </Button>
                 )}
               </div>
