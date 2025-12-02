@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Ride } from '@/lib/types';
-import RideMap from './RideMap';
+import { Ride, Language } from '@/lib/types';
+import Map, { MapLocation } from './Map';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -10,7 +10,7 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { Rating } from './Rating';
 import RideChat from './RideChat';
-import { Phone, X } from 'lucide-react';
+import { Phone, X, Car, User, MapPin } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,9 +28,134 @@ interface RideStatusProps {
   onRideComplete: () => void;
 }
 
+const translations = {
+  en: {
+    rideStatus: 'Ride Status',
+    callDriver: 'Call Driver',
+    cancel: 'Cancel',
+    cancelRide: 'Cancel Ride?',
+    cancelDescription: 'Are you sure you want to cancel this ride? This action cannot be undone.',
+    noKeepRide: 'No, keep ride',
+    yesCancelRide: 'Yes, cancel ride',
+    driverOnTheWay: 'Driver on the way!',
+    comingToPickYou: 'is coming to pick you up.',
+    vehicle: 'Vehicle',
+    licensePlate: 'License Plate',
+    unknown: 'Unknown',
+    na: 'N/A',
+    rateYourRide: 'Rate Your Ride',
+    leaveComment: 'Leave a comment (optional)',
+    submitRating: 'Submit Rating',
+    bookAnotherRide: 'Book Another Ride',
+    loading: 'Loading ride status...',
+    error: 'Error',
+    rideNotFound: 'Ride not found.',
+    rideCanceled: 'Ride has been canceled.',
+    failedToCancel: 'Failed to cancel ride.',
+    driverPhoneNotAvailable: 'Driver phone number not available',
+    selectRating: 'Please select a rating before submitting.',
+    failedToSubmitRating: 'Failed to submit rating.',
+    thankYouFeedback: 'Thank you for your feedback!',
+    rideStatusUpdated: 'Ride Status Updated',
+    yourRideIsNow: 'Your ride is now',
+    rideAccepted: 'Ride Accepted!',
+    driverAccepted: 'Your driver has accepted the ride and is on the way.',
+    pending: 'PENDING',
+    accepted: 'ACCEPTED',
+    driver_en_route: 'DRIVER EN ROUTE',
+    driver_arrived: 'DRIVER ARRIVED',
+    in_progress: 'IN PROGRESS',
+    completed: 'COMPLETED',
+    cancelled: 'CANCELLED',
+    waitingForDriver: 'Waiting for a driver to accept your ride...',
+  },
+  fr: {
+    rideStatus: 'Statut de la course',
+    callDriver: 'Appeler',
+    cancel: 'Annuler',
+    cancelRide: 'Annuler la course ?',
+    cancelDescription: 'Êtes-vous sûr de vouloir annuler cette course ? Cette action est irréversible.',
+    noKeepRide: 'Non, garder',
+    yesCancelRide: 'Oui, annuler',
+    driverOnTheWay: 'Chauffeur en route !',
+    comingToPickYou: 'vient vous chercher.',
+    vehicle: 'Véhicule',
+    licensePlate: 'Plaque',
+    unknown: 'Inconnu',
+    na: 'N/A',
+    rateYourRide: 'Évaluez votre course',
+    leaveComment: 'Laissez un commentaire (optionnel)',
+    submitRating: 'Envoyer',
+    bookAnotherRide: 'Réserver une autre course',
+    loading: 'Chargement...',
+    error: 'Erreur',
+    rideNotFound: 'Course non trouvée.',
+    rideCanceled: 'Course annulée.',
+    failedToCancel: 'Échec de l\'annulation.',
+    driverPhoneNotAvailable: 'Numéro du chauffeur non disponible',
+    selectRating: 'Veuillez sélectionner une note.',
+    failedToSubmitRating: 'Échec de l\'envoi de la note.',
+    thankYouFeedback: 'Merci pour votre retour !',
+    rideStatusUpdated: 'Statut mis à jour',
+    yourRideIsNow: 'Votre course est maintenant',
+    rideAccepted: 'Course acceptée !',
+    driverAccepted: 'Votre chauffeur a accepté la course et est en route.',
+    pending: 'EN ATTENTE',
+    accepted: 'ACCEPTÉE',
+    driver_en_route: 'EN ROUTE',
+    driver_arrived: 'ARRIVÉ',
+    in_progress: 'EN COURS',
+    completed: 'TERMINÉE',
+    cancelled: 'ANNULÉE',
+    waitingForDriver: 'En attente d\'un chauffeur...',
+  },
+  ar: {
+    rideStatus: 'حالة الرحلة',
+    callDriver: 'اتصل',
+    cancel: 'إلغاء',
+    cancelRide: 'إلغاء الرحلة؟',
+    cancelDescription: 'هل أنت متأكد أنك تريد إلغاء هذه الرحلة؟ لا يمكن التراجع عن هذا الإجراء.',
+    noKeepRide: 'لا، احتفظ',
+    yesCancelRide: 'نعم، ألغِ',
+    driverOnTheWay: 'السائق في الطريق!',
+    comingToPickYou: 'قادم لاصطحابك.',
+    vehicle: 'السيارة',
+    licensePlate: 'اللوحة',
+    unknown: 'غير معروف',
+    na: 'غير متوفر',
+    rateYourRide: 'قيّم رحلتك',
+    leaveComment: 'اترك تعليقًا (اختياري)',
+    submitRating: 'إرسال',
+    bookAnotherRide: 'احجز رحلة أخرى',
+    loading: 'جار التحميل...',
+    error: 'خطأ',
+    rideNotFound: 'الرحلة غير موجودة.',
+    rideCanceled: 'تم إلغاء الرحلة.',
+    failedToCancel: 'فشل في الإلغاء.',
+    driverPhoneNotAvailable: 'رقم السائق غير متوفر',
+    selectRating: 'يرجى اختيار تقييم.',
+    failedToSubmitRating: 'فشل في إرسال التقييم.',
+    thankYouFeedback: 'شكرًا على ملاحظاتك!',
+    rideStatusUpdated: 'تحديث الحالة',
+    yourRideIsNow: 'رحلتك الآن',
+    rideAccepted: 'تم قبول الرحلة!',
+    driverAccepted: 'قبل السائق رحلتك وهو في الطريق.',
+    pending: 'قيد الانتظار',
+    accepted: 'مقبولة',
+    driver_en_route: 'في الطريق',
+    driver_arrived: 'وصل',
+    in_progress: 'جارية',
+    completed: 'مكتملة',
+    cancelled: 'ملغاة',
+    waitingForDriver: 'في انتظار سائق...',
+  }
+};
+
 export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) {
-  const { user, profile } = useAuth();
+  const { user, language } = useAuth();
+  const t = translations[language];
   const [ride, setRide] = useState<Ride | null>(null);
+  const [driverLocation, setDriverLocation] = useState<MapLocation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
@@ -42,12 +167,13 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
     if (window.Notification && Notification.permission === 'granted') {
       new Notification(title, options);
     } else if (window.Notification && Notification.permission === 'default') {
-        Notification.requestPermission();
+      Notification.requestPermission();
     }
   }
 
   const fetchRide = async () => {
     try {
+      console.log('Fetching ride:', rideId);
       const { data, error } = await supabase
         .from('rides')
         .select(`*, driver:profiles!rides_driver_id_fkey ( full_name, phone )`)
@@ -79,37 +205,108 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
 
       // Check for status change and notify
       if (rideData.status && prevStatusRef.current !== rideData.status) {
-          if(prevStatusRef.current !== null) { // Don't notify on first load
-            showNotification("Ride Status Updated", { body: `Your ride is now ${rideData.status}.` });
+        if (prevStatusRef.current !== null) {
+          // Notify on status change
+          const statusText = t[rideData.status as keyof typeof t] || rideData.status;
+          showNotification(t.rideStatusUpdated, { body: `${t.yourRideIsNow} ${statusText}.` });
+          
+          // Special toast for when ride is accepted
+          if (rideData.status === 'accepted' && prevStatusRef.current === 'pending') {
+            toast.success(t.rideAccepted, {
+              description: t.driverAccepted,
+              duration: 5000,
+            });
           }
-          prevStatusRef.current = rideData.status;
+        }
+        prevStatusRef.current = rideData.status;
       }
 
     } catch (err: any) {
+      console.error('Error fetching ride:', err);
       setError(err.message || 'Failed to fetch ride details');
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch driver location
+  const fetchDriverLocation = async (driverId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('driver_locations')
+        .select('latitude, longitude')
+        .eq('driver_id', driverId)
+        .single();
+
+      if (!error && data) {
+        setDriverLocation({ lat: data.latitude, lng: data.longitude });
+      }
+    } catch (err) {
+      console.error('Error fetching driver location:', err);
+    }
+  };
+
   useEffect(() => {
+    // Request notification permission
+    if (window.Notification && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
     fetchRide();
 
     // Subscribe to real-time ride updates
-    const subscription = supabase
-      .channel(`ride-${rideId}`)
+    console.log('Setting up ride subscription for:', rideId);
+    const rideSubscription = supabase
+      .channel(`ride-status-${rideId}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${rideId}` },
-        () => fetchRide()
+        { event: '*', schema: 'public', table: 'rides', filter: `id=eq.${rideId}` },
+        (payload) => {
+          console.log('Ride update received:', payload);
+          fetchRide();
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Ride subscription status:', status);
+      });
 
     return () => {
-      supabase.removeChannel(subscription);
+      supabase.removeChannel(rideSubscription);
     };
-     // eslint-disable-next-line 
   }, [rideId]);
+
+  // Subscribe to driver location updates when driver is assigned
+  useEffect(() => {
+    if (!ride?.driver_id) return;
+
+    // Initial fetch
+    fetchDriverLocation(ride.driver_id);
+
+    // Subscribe to driver location updates
+    console.log('Setting up driver location subscription for:', ride.driver_id);
+    const locationSubscription = supabase
+      .channel(`driver-location-${ride.driver_id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'driver_locations', filter: `driver_id=eq.${ride.driver_id}` },
+        (payload) => {
+          console.log('Driver location update:', payload);
+          if (payload.new && 'latitude' in payload.new && 'longitude' in payload.new) {
+            setDriverLocation({
+              lat: payload.new.latitude as number,
+              lng: payload.new.longitude as number
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Driver location subscription status:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(locationSubscription);
+    };
+  }, [ride?.driver_id]);
 
   const handleCancelRide = async () => {
     setLoading(true);
@@ -123,32 +320,32 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
 
       if (checkErr) {
         console.error('Ride check error before cancel:', checkErr);
-        toast.error('Unable to verify ride ownership before canceling.');
+        toast.error(t.failedToCancel);
         setLoading(false);
         return;
       }
 
       if (!rideCheck) {
-        toast.error('Ride not found');
+        toast.error(t.rideNotFound);
         setLoading(false);
         return;
       }
 
       if (rideCheck.customer_id !== user!.id) {
-        toast.error('You are not authorized to cancel this ride (ownership mismatch).');
+        toast.error(t.failedToCancel);
         setLoading(false);
         return;
       }
 
-      if (rideCheck.status !== 'pending') {
-        toast.error('Only pending rides can be canceled.');
+      if (rideCheck.status !== 'pending' && rideCheck.status !== 'accepted') {
+        toast.error(t.failedToCancel);
         setLoading(false);
         return;
       }
 
     } catch (err) {
       console.error('Pre-cancel check failed:', err);
-      toast.error('Pre-cancel verification failed');
+      toast.error(t.failedToCancel);
       setLoading(false);
       return;
     }
@@ -161,15 +358,13 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
         cancelled_by: 'customer'
       })
       .eq('id', rideId)
-      .eq('customer_id', user!.id)
-      .eq('status', 'pending');
+      .eq('customer_id', user!.id);
     
     if (error) {
       console.error('Cancel error:', error);
-      const message = error.message || 'Failed to cancel ride.';
-      toast.error(`${message}${error.details ? ` - ${error.details}` : ''}`);
+      toast.error(t.failedToCancel);
     } else {
-      toast.success("Ride has been canceled.");
+      toast.success(t.rideCanceled);
       onRideComplete();
     }
     setLoading(false);
@@ -179,14 +374,14 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
     if (ride?.driver && 'phone' in ride.driver && ride.driver.phone) {
       window.location.href = `tel:${ride.driver.phone}`;
     } else {
-      toast.error("Driver phone number not available");
+      toast.error(t.driverPhoneNotAvailable);
     }
   };
 
   const handleRateRide = async () => {
     if (rating === 0) {
-        toast.error("Please select a rating before submitting.");
-        return;
+      toast.error(t.selectRating);
+      return;
     }
     const { error } = await supabase
       .from('ride_ratings')
@@ -199,30 +394,55 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
       });
 
     if (error) {
-      toast.error("Failed to submit rating.");
+      toast.error(t.failedToSubmitRating);
     } else {
-      toast.success("Thank you for your feedback!");
-      // Update ride status to 'rated'
+      toast.success(t.thankYouFeedback);
       await supabase.from('rides').update({ status: 'rated' }).eq('id', rideId);
       onRideComplete();
     }
   };
 
-  if (loading) return <div>Loading ride status...</div>;
-  if (error) return <div className="text-red-500">Error: {error}</div>;
-  if (!ride) return <div>Ride not found.</div>;
+  const getStatusDisplay = (status: string) => {
+    const statusKey = status as keyof typeof t;
+    return t[statusKey] || status.replace('_', ' ').toUpperCase();
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center p-8">
+      <div className="text-center space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/30 border-t-primary mx-auto"></div>
+        <p className="text-sm text-muted-foreground">{t.loading}</p>
+      </div>
+    </div>
+  );
+  
+  if (error) return (
+    <div className="p-4">
+      <Alert variant="destructive">
+        <AlertTitle>{t.error}</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    </div>
+  );
+  
+  if (!ride) return <div className="p-4 text-center text-muted-foreground">{t.rideNotFound}</div>;
 
   const canCancel = ride.status === 'pending' || ride.status === 'accepted';
+  const pickupLocation: MapLocation = { lat: ride.pickup_lat, lng: ride.pickup_lng };
+  const dropoffLocation: MapLocation = { lat: ride.dropoff_lat, lng: ride.dropoff_lng };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-4 p-4 ${language === 'ar' ? 'rtl' : 'ltr'}`}>
       <Card>
-        <CardHeader>
-          <CardTitle className="flex justify-between items-center">
-            <span>Ride Status</span>
-            <div className="flex gap-2 items-center">
-              <Badge variant={ride.status === 'completed' ? 'default' : 'secondary'}>
-                {ride.status.replace('_', ' ').toUpperCase()}
+        <CardHeader className="pb-3">
+          <CardTitle className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <span className="text-lg">{t.rideStatus}</span>
+            <div className="flex flex-wrap gap-2 items-center">
+              <Badge 
+                variant={ride.status === 'completed' ? 'default' : ride.status === 'cancelled' ? 'destructive' : 'secondary'}
+                className="text-xs"
+              >
+                {getStatusDisplay(ride.status)}
               </Badge>
               {ride.driver && ride.status !== 'completed' && ride.status !== 'cancelled' && (
                 <Button
@@ -232,7 +452,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
                   className="gap-2"
                 >
                   <Phone className="h-4 w-4" />
-                  Call Driver
+                  {t.callDriver}
                 </Button>
               )}
               {canCancel && (
@@ -240,20 +460,20 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="sm" className="gap-2">
                       <X className="h-4 w-4" />
-                      Cancel
+                      {t.cancel}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Cancel Ride?</AlertDialogTitle>
+                      <AlertDialogTitle>{t.cancelRide}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to cancel this ride? This action cannot be undone.
+                        {t.cancelDescription}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>No, keep ride</AlertDialogCancel>
+                      <AlertDialogCancel>{t.noKeepRide}</AlertDialogCancel>
                       <AlertDialogAction onClick={handleCancelRide}>
-                        Yes, cancel ride
+                        {t.yesCancelRide}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -262,15 +482,48 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <RideMap ride={ride} />
+        <CardContent className="space-y-4">
+          {/* Map with driver tracking */}
+          <Map
+            pickupLocation={pickupLocation}
+            dropoffLocation={dropoffLocation}
+            driverLocation={driverLocation}
+            height="h-64 sm:h-80"
+            showCurrentLocation={false}
+            interactive={false}
+          />
+          
+          {/* Waiting message when no driver yet */}
+          {ride.status === 'pending' && !ride.driver && (
+            <Alert>
+              <MapPin className="h-4 w-4" />
+              <AlertTitle>{t.waitingForDriver}</AlertTitle>
+            </Alert>
+          )}
+
+          {/* Driver info when assigned */}
           {ride.driver && (
-            <Alert className="mt-4">
-              <AlertTitle>Driver on the way!</AlertTitle>
-              <AlertDescription>
-                {ride.driver.full_name} is coming to pick you up.
-                <p>Vehicle: {ride.driver?.vehicle_model ?? 'Unknown'} ({ride.driver?.vehicle_color ?? 'N/A'})</p>
-                <p>License Plate: {ride.driver?.license_plate_number ?? 'N/A'}</p>
+            <Alert className="border-primary/20 bg-primary/5">
+              <Car className="h-4 w-4 text-primary" />
+              <AlertTitle className="text-primary">{t.driverOnTheWay}</AlertTitle>
+              <AlertDescription className="space-y-2 mt-2">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{ride.driver.full_name}</span>
+                  <span className="text-muted-foreground">{t.comingToPickYou}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">{t.vehicle}: </span>
+                    <span className="font-medium">
+                      {ride.driver?.vehicle_model ?? t.unknown} ({ride.driver?.vehicle_color ?? t.na})
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">{t.licensePlate}: </span>
+                    <span className="font-medium">{ride.driver?.license_plate_number ?? t.na}</span>
+                  </div>
+                </div>
               </AlertDescription>
             </Alert>
           )}
@@ -281,27 +534,28 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
       {ride.driver_id && <RideChat rideId={rideId} userRole="customer" />}
 
       {ride.status === 'completed' && (
-          <Card>
-              <CardHeader>
-                  <CardTitle>Rate Your Ride</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                  <Rating value={rating} onChange={setRating} />
-                  <textarea 
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      placeholder="Leave a comment (optional)"
-                      className="w-full p-2 border rounded"
-                  />
-                  <Button onClick={handleRateRide}>Submit Rating</Button>
-              </CardContent>
-          </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t.rateYourRide}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Rating value={rating} onChange={setRating} />
+            <textarea 
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder={t.leaveComment}
+              className="w-full p-3 border rounded-lg resize-none bg-background"
+              rows={3}
+            />
+            <Button onClick={handleRateRide} className="w-full">{t.submitRating}</Button>
+          </CardContent>
+        </Card>
       )}
 
-  {(ride.status === 'completed' || ride.status === 'rated' || ride.status === 'cancelled') && (
-          <Button onClick={onRideComplete} className="w-full">
-              Book Another Ride
-          </Button>
+      {(ride.status === 'completed' || ride.status === 'rated' || ride.status === 'cancelled') && (
+        <Button onClick={onRideComplete} className="w-full">
+          {t.bookAnotherRide}
+        </Button>
       )}
     </div>
   );
