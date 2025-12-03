@@ -8,9 +8,9 @@ import { Badge } from './ui/badge';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { Rating } from './Rating';
 import RideChat from './RideChat';
-import { Phone, X, Car, User, MapPin } from 'lucide-react';
+import { RatingFeedbackDialog } from './RatingFeedbackDialog';
+import { Phone, X, Car, User, MapPin, Star } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -158,8 +158,8 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
   const [driverLocation, setDriverLocation] = useState<MapLocation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
+  const [showRatingDialog, setShowRatingDialog] = useState(false);
+  const [driverRatingInfo, setDriverRatingInfo] = useState<{ average: number; count: number } | null>(null);
   const prevStatusRef = useRef<string | null>(null);
 
   // Helper to show browser notification
@@ -199,6 +199,19 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
             license_plate_number: dp.license_plate_number,
             vehicle_photo_url: dp.vehicle_photo_url,
           };
+        }
+
+        // Fetch driver's average rating
+        const { data: ratings } = await supabase
+          .from('ride_ratings')
+          .select('rating')
+          .eq('driver_id', rideData.driver_id);
+
+        if (ratings && ratings.length > 0) {
+          const avg = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
+          setDriverRatingInfo({ average: avg, count: ratings.length });
+        } else {
+          setDriverRatingInfo({ average: 0, count: 0 });
         }
       }
 
@@ -379,30 +392,6 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
     }
   };
 
-  const handleRateRide = async () => {
-    if (rating === 0) {
-      toast.error(t.selectRating);
-      return;
-    }
-    const { error } = await supabase
-      .from('ride_ratings')
-      .insert({
-        ride_id: rideId,
-        user_id: user!.id,
-        driver_id: ride!.driver_id!,
-        rating,
-        comment,
-      });
-
-    if (error) {
-      toast.error(t.failedToSubmitRating);
-    } else {
-      toast.success(t.thankYouFeedback);
-      await supabase.from('rides').update({ status: 'rated' }).eq('id', rideId);
-      onRideComplete();
-    }
-  };
-
   const getStatusDisplay = (status: string) => {
     const statusKey = status as keyof typeof t;
     return t[statusKey] || status.replace('_', ' ').toUpperCase();
@@ -514,6 +503,21 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
                   <span className="text-muted-foreground">{t.comingToPickYou}</span>
                 </div>
                 
+                {/* Driver Rating */}
+                {driverRatingInfo && driverRatingInfo.count > 0 && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    <span className="font-medium">{driverRatingInfo.average.toFixed(1)}</span>
+                    <span className="text-muted-foreground">({driverRatingInfo.count} {driverRatingInfo.count === 1 ? 'review' : 'reviews'})</span>
+                  </div>
+                )}
+                {driverRatingInfo && driverRatingInfo.count === 0 && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Star className="h-4 w-4" />
+                    <span>New driver</span>
+                  </div>
+                )}
+
                 {/* Car Photo */}
                 {ride.driver?.vehicle_photo_url && (
                   <div className="rounded-lg overflow-hidden border border-border">
@@ -546,24 +550,25 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
       {/* Ride Chat only if driver is assigned */}
       {ride.driver_id && <RideChat rideId={rideId} userRole="customer" />}
 
-      {ride.status === 'completed' && (
+      {ride.status === 'completed' && !showRatingDialog && (
         <Card>
           <CardHeader>
             <CardTitle>{t.rateYourRide}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Rating value={rating} onChange={setRating} />
-            <textarea 
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder={t.leaveComment}
-              className="w-full p-3 border rounded-lg resize-none bg-background"
-              rows={3}
-            />
-            <Button onClick={handleRateRide} className="w-full">{t.submitRating}</Button>
+          <CardContent>
+            <Button onClick={() => setShowRatingDialog(true)} className="w-full">
+              {t.rateYourRide}
+            </Button>
           </CardContent>
         </Card>
       )}
+
+      <RatingFeedbackDialog
+        open={showRatingDialog}
+        onOpenChange={setShowRatingDialog}
+        rideId={rideId}
+        language={language}
+      />
 
       {(ride.status === 'completed' || ride.status === 'rated' || ride.status === 'cancelled') && (
         <Button onClick={onRideComplete} className="w-full">
