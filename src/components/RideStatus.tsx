@@ -187,7 +187,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
       if (rideData?.driver_id) {
         const { data: dp, error: dpErr } = await supabase
           .from('driver_profiles')
-          .select('vehicle_model, vehicle_color, license_plate_number')
+          .select('vehicle_model, vehicle_color, license_plate_number, vehicle_photo_url')
           .eq('driver_id', rideData.driver_id)
           .single();
 
@@ -197,6 +197,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
             vehicle_model: dp.vehicle_model,
             vehicle_color: dp.vehicle_color,
             license_plate_number: dp.license_plate_number,
+            vehicle_photo_url: dp.vehicle_photo_url,
           };
         }
       }
@@ -506,12 +507,24 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
             <Alert className="border-primary/20 bg-primary/5">
               <Car className="h-4 w-4 text-primary" />
               <AlertTitle className="text-primary">{t.driverOnTheWay}</AlertTitle>
-              <AlertDescription className="space-y-2 mt-2">
+              <AlertDescription className="space-y-3 mt-2">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">{ride.driver.full_name}</span>
                   <span className="text-muted-foreground">{t.comingToPickYou}</span>
                 </div>
+                
+                {/* Car Photo */}
+                {ride.driver?.vehicle_photo_url && (
+                  <div className="rounded-lg overflow-hidden border border-border">
+                    <img 
+                      src={ride.driver.vehicle_photo_url} 
+                      alt="Driver's vehicle"
+                      className="w-full h-32 object-cover"
+                    />
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <span className="text-muted-foreground">{t.vehicle}: </span>

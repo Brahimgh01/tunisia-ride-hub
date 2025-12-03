@@ -156,6 +156,7 @@ export type Database = {
           updated_at: string | null
           vehicle_color: string | null
           vehicle_model: string | null
+          vehicle_photo_url: string | null
           vehicle_registration_document_url: string | null
           vehicle_type: string | null
         }
@@ -177,6 +178,7 @@ export type Database = {
           updated_at?: string | null
           vehicle_color?: string | null
           vehicle_model?: string | null
+          vehicle_photo_url?: string | null
           vehicle_registration_document_url?: string | null
           vehicle_type?: string | null
         }
@@ -198,6 +200,7 @@ export type Database = {
           updated_at?: string | null
           vehicle_color?: string | null
           vehicle_model?: string | null
+          vehicle_photo_url?: string | null
           vehicle_registration_document_url?: string | null
           vehicle_type?: string | null
         }

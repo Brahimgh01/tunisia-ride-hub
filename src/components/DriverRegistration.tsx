@@ -278,6 +278,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
         id_document_back_url: idBackUrl,
         license_document_url: licenseUrl,
         vehicle_registration_document_url: vehicleRegUrl,
+        vehicle_photo_url: carPhotoUrl,
         is_verified: false,
         is_available: false,
       }, { onConflict: 'driver_id' })
