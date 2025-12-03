@@ -161,6 +161,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
   const [showRatingDialog, setShowRatingDialog] = useState(false);
   const [driverRatingInfo, setDriverRatingInfo] = useState<{ average: number; count: number } | null>(null);
   const prevStatusRef = useRef<string | null>(null);
+  const ratingShownRef = useRef(false);
 
   // Helper to show browser notification
   function showNotification(title: string, options?: NotificationOptions) {
@@ -230,6 +231,12 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
               description: t.driverAccepted,
               duration: 5000,
             });
+          }
+          
+          // Auto-show rating dialog when ride completes
+          if (rideData.status === 'completed' && !ratingShownRef.current) {
+            ratingShownRef.current = true;
+            setShowRatingDialog(true);
           }
         }
         prevStatusRef.current = rideData.status;
@@ -351,7 +358,8 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
         return;
       }
 
-      if (rideCheck.status !== 'pending' && rideCheck.status !== 'accepted') {
+      const cancellableStatuses = ['pending', 'accepted', 'driver_en_route', 'driver_arrived'];
+      if (!cancellableStatuses.includes(rideCheck.status)) {
         toast.error(t.failedToCancel);
         setLoading(false);
         return;
@@ -417,7 +425,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
   
   if (!ride) return <div className="p-4 text-center text-muted-foreground">{t.rideNotFound}</div>;
 
-  const canCancel = ride.status === 'pending' || ride.status === 'accepted';
+  const canCancel = ['pending', 'accepted', 'driver_en_route', 'driver_arrived'].includes(ride.status);
   const pickupLocation: MapLocation = { lat: ride.pickup_lat, lng: ride.pickup_lng };
   const dropoffLocation: MapLocation = { lat: ride.dropoff_lat, lng: ride.dropoff_lng };
 
