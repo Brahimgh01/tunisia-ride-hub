@@ -20,6 +20,7 @@ export interface Profile {
   license_plate_number?: string;
   license_document_url?: string;
   vehicle_registration_document_url?: string;
+  vehicle_photo_url?: string;
   is_verified?: boolean;
   is_available?: boolean;
   last_location?: { lat: number, lng: number };
