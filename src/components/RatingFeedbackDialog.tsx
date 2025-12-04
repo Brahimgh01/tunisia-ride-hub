@@ -81,31 +81,62 @@ export function RatingFeedbackDialog({ open, onOpenChange, rideId, language }: R
 
     setSubmitting(true);
 
-    const updates: any = {
-      driver_rating: rating,
-    };
+    try {
+      // First get the ride to find driver_id and user_id
+      const { data: rideData, error: rideError } = await supabase
+        .from('rides')
+        .select('driver_id, customer_id')
+        .eq('id', rideId)
+        .single();
 
-    if (feedback.trim()) {
-      updates.customer_notes = `[${feedbackType}] ${feedback}`;
-    }
+      if (rideError || !rideData?.driver_id) {
+        throw new Error('Could not find ride or driver');
+      }
 
-    const { error } = await supabase
-      .from('rides')
-      .update(updates)
-      .eq('id', rideId);
+      // Update the ride with rating
+      const updates: any = {
+        driver_rating: rating,
+      };
 
-    setSubmitting(false);
+      if (feedback.trim()) {
+        updates.customer_notes = `[${feedbackType}] ${feedback}`;
+      }
 
-    if (error) {
-      toast({
-        title: t.error,
-        variant: 'destructive',
-      });
-    } else {
+      const { error: updateError } = await supabase
+        .from('rides')
+        .update(updates)
+        .eq('id', rideId);
+
+      if (updateError) throw updateError;
+
+      // Insert into ride_ratings table for driver's rating history
+      const { error: ratingError } = await supabase
+        .from('ride_ratings')
+        .insert({
+          ride_id: rideId,
+          driver_id: rideData.driver_id,
+          user_id: rideData.customer_id,
+          rating: rating,
+          comment: feedback.trim() || null,
+        });
+
+      if (ratingError) {
+        console.error('Error saving to ride_ratings:', ratingError);
+        // Don't fail the whole operation if this fails
+      }
+
       toast({
         title: t.success,
       });
       onOpenChange(false);
+    } catch (error: any) {
+      console.error('Rating submission error:', error);
+      toast({
+        title: t.error,
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
