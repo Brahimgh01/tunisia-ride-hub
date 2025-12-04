@@ -342,39 +342,42 @@ export default function DriverDashboard() {
     console.log('🔄 Changing availability:', { userId: user.id, available });
     setIsAvailable(available);
 
-    const { error } = await supabase
-      .from('driver_profiles')
-      .update({ is_available: available })
-      .eq('driver_id', user.id);
+    // Update BOTH driver_profiles AND driver_locations simultaneously
+    const [profileResult, locationResult] = await Promise.all([
+      supabase
+        .from('driver_profiles')
+        .update({ is_available: available })
+        .eq('driver_id', user.id),
+      // Always update driver_locations immediately
+      supabase
+        .from('driver_locations')
+        .upsert({
+          driver_id: user.id,
+          latitude: location?.lat || 36.8065,
+          longitude: location?.lng || 10.1815,
+          is_available: available,
+          last_updated: new Date().toISOString()
+        }, { onConflict: 'driver_id' })
+    ]);
 
-    if (error) {
-      console.error('❌ Error updating availability:', error);
+    if (profileResult.error || locationResult.error) {
+      console.error('❌ Error updating availability:', profileResult.error || locationResult.error);
       toast.error('Failed to update availability');
       setIsAvailable(!available);
     } else {
-      console.log('✅ Availability updated in driver_profiles');
+      console.log('✅ Availability updated in both tables');
       toast.success(`You are now ${available ? 'online' : 'offline'}`);
       
-      // Force immediate location update when going online
-      if (available) {
-        if (location) {
-          await updateLocationInDb(location.lat, location.lng);
-        } else if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const { latitude, longitude } = position.coords;
-              setLocation({ lat: latitude, lng: longitude });
-              updateLocationInDb(latitude, longitude);
-            },
-            (err) => console.error('Location error:', err)
-          );
-        }
-      } else {
-        // Mark as unavailable in driver_locations when going offline
-        await supabase
-          .from('driver_locations')
-          .update({ is_available: false })
-          .eq('driver_id', user.id);
+      // If going online, start tracking location
+      if (available && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            setLocation({ lat: latitude, lng: longitude });
+            updateLocationInDb(latitude, longitude);
+          },
+          (err) => console.error('Location error:', err)
+        );
       }
     }
   };

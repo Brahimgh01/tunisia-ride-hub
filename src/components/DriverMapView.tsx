@@ -110,7 +110,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       startLocationTracking();
       fetchPendingRides();
       
-      // Subscribe to ride requests - both new inserts AND updates when assigned
+      // Subscribe to ride requests - new inserts AND ALL updates (including cancellations)
       const channel = supabase
         .channel('pending-rides')
         // Listen for new pending rides
@@ -123,17 +123,28 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
             toast.info(`🚗 ${t.newRideNearby}`);
           }
         )
-        // Listen for rides assigned to this driver
+        // Listen for ALL ride updates (including cancellations)
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'rides', filter: `driver_id=eq.${driverId}` },
+          { event: 'UPDATE', schema: 'public', table: 'rides' },
           (payload) => {
-            console.log('🎯 Ride assigned to you:', payload);
+            console.log('📝 Ride updated:', payload);
+            const ride = payload.new as any;
+            
+            // If ride was assigned to this driver
+            if (ride.driver_id === driverId && payload.old && !(payload.old as any).driver_id) {
+              toast.success(`🎯 ${t.rideAssigned}`, {
+                description: t.checkMap,
+                duration: 5000
+              });
+            }
+            
+            // If ride was cancelled, just refresh the list
+            if (ride.status === 'cancelled') {
+              console.log('🚫 Ride was cancelled');
+            }
+            
             fetchPendingRides();
-            toast.success(`🎯 ${t.rideAssigned}`, {
-              description: t.checkMap,
-              duration: 5000
-            });
           }
         )
         .subscribe();
