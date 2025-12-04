@@ -515,8 +515,8 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
             </Alert>
           )}
 
-          {/* Driver info when assigned */}
-          {ride.driver && (
+          {/* Driver info when assigned AND ride has been accepted */}
+          {ride.driver && ride.status !== 'pending' && (
             <Alert className="border-primary/20 bg-primary/5">
               <Car className="h-4 w-4 text-primary" />
               <AlertTitle className="text-primary">{t.driverOnTheWay}</AlertTitle>
