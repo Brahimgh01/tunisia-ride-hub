@@ -218,43 +218,48 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
 
       setRide(rideData as unknown as Ride);
 
-      // Check for status change and notify
-      if (rideData.status && prevStatusRef.current !== rideData.status) {
-        if (prevStatusRef.current !== null) {
-          // Notify on status change
-          const statusText = t[rideData.status as keyof typeof t] || rideData.status;
-          showNotification(t.rideStatusUpdated, { body: `${t.yourRideIsNow} ${statusText}.` });
-          
-          // Special toast for when ride is accepted
-          if (rideData.status === 'accepted' && prevStatusRef.current === 'pending') {
-            toast.success(t.rideAccepted, {
-              description: t.driverAccepted,
-              duration: 5000,
-            });
-          }
-          
-          // Toast for driver en route
-          if (rideData.status === 'driver_en_route') {
-            toast.info('🚗 Driver is on the way to pick you up!', { duration: 4000 });
-          }
-          
-          // Toast for driver arrived
-          if (rideData.status === 'driver_arrived') {
-            toast.success('📍 Your driver has arrived!', { duration: 5000 });
-          }
-          
-          // Toast for ride started
-          if (rideData.status === 'in_progress') {
-            toast.info('🚀 Your ride has started!', { duration: 4000 });
-          }
-          
-          // Auto-show rating dialog when ride completes
-          if (rideData.status === 'completed' && !ratingShownRef.current) {
-            ratingShownRef.current = true;
-            toast.success('🎉 Ride completed!', { duration: 3000 });
-            setTimeout(() => setShowRatingDialog(true), 500);
-          }
+      // Auto-show rating dialog when ride is completed (on initial load OR status change)
+      if (rideData.status === 'completed' && !ratingShownRef.current) {
+        ratingShownRef.current = true;
+        // Small delay to ensure UI is ready
+        setTimeout(() => {
+          toast.success('🎉 Ride completed!', { duration: 3000 });
+          setShowRatingDialog(true);
+        }, 500);
+      }
+
+      // Check for status change and notify (only when status actually changes)
+      if (rideData.status && prevStatusRef.current !== null && prevStatusRef.current !== rideData.status) {
+        // Notify on status change
+        const statusText = t[rideData.status as keyof typeof t] || rideData.status;
+        showNotification(t.rideStatusUpdated, { body: `${t.yourRideIsNow} ${statusText}.` });
+        
+        // Special toast for when ride is accepted
+        if (rideData.status === 'accepted' && prevStatusRef.current === 'pending') {
+          toast.success(t.rideAccepted, {
+            description: t.driverAccepted,
+            duration: 5000,
+          });
         }
+        
+        // Toast for driver en route
+        if (rideData.status === 'driver_en_route') {
+          toast.info('🚗 Driver is on the way to pick you up!', { duration: 4000 });
+        }
+        
+        // Toast for driver arrived
+        if (rideData.status === 'driver_arrived') {
+          toast.success('📍 Your driver has arrived!', { duration: 5000 });
+        }
+        
+        // Toast for ride started
+        if (rideData.status === 'in_progress') {
+          toast.info('🚀 Your ride has started!', { duration: 4000 });
+        }
+      }
+      
+      // Always update the previous status ref
+      if (rideData.status) {
         prevStatusRef.current = rideData.status;
       }
 
