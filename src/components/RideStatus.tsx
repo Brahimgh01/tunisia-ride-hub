@@ -233,10 +233,26 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
             });
           }
           
+          // Toast for driver en route
+          if (rideData.status === 'driver_en_route') {
+            toast.info('🚗 Driver is on the way to pick you up!', { duration: 4000 });
+          }
+          
+          // Toast for driver arrived
+          if (rideData.status === 'driver_arrived') {
+            toast.success('📍 Your driver has arrived!', { duration: 5000 });
+          }
+          
+          // Toast for ride started
+          if (rideData.status === 'in_progress') {
+            toast.info('🚀 Your ride has started!', { duration: 4000 });
+          }
+          
           // Auto-show rating dialog when ride completes
           if (rideData.status === 'completed' && !ratingShownRef.current) {
             ratingShownRef.current = true;
-            setShowRatingDialog(true);
+            toast.success('🎉 Ride completed!', { duration: 3000 });
+            setTimeout(() => setShowRatingDialog(true), 500);
           }
         }
         prevStatusRef.current = rideData.status;

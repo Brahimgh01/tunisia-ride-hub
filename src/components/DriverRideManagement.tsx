@@ -160,9 +160,17 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
   // Update ride status for active ride
   const updateRideStatus = async (status: string) => {
     if (!user || !activeRide) return;
+    
+    // Build update data - set final_price when completing ride
+    const updateData: any = { status };
+    if (status === 'completed') {
+      updateData.completed_at = new Date().toISOString();
+      updateData.final_price = activeRide.estimated_price || 0;
+    }
+    
     const { error } = await supabase
       .from('rides')
-      .update({ status })
+      .update(updateData)
       .eq('id', activeRide.id);
     if (error) {
       toast.error('Failed to update ride status');
