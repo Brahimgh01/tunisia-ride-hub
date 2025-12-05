@@ -60,7 +60,7 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
           .from('rides')
           .select('*')
           .eq('customer_id', user.id)
-          .in('status', ['pending', 'accepted', 'driver_en_route', 'driver_arrived', 'in_progress'])
+          .in('status', ['pending', 'accepted', 'driver_en_route', 'driver_arrived', 'in_progress', 'completed'])
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
