@@ -4,12 +4,18 @@ import { Button } from '@/components/ui/button';
 import BookRide from './BookRide';
 import RideStatus from './RideStatus';
 import { NotificationBell } from './NotificationBell';
-import { ArrowLeft, History, Star, MapPin } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { ArrowLeft, History, MapPin, Sun, Moon, Globe } from 'lucide-react';
+import { useAuth, Language } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Ride } from '@/lib/types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import RideHistory from './RideHistory';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface CustomerDashboardProps {
   onBack: () => void;
@@ -21,32 +27,56 @@ const translations = {
     error: 'Could not load ride status. Please try again later.',
     history: 'Ride History',
     back: 'Back',
+    language: 'Language',
+    theme: 'Theme',
+    light: 'Light',
+    dark: 'Dark',
   },
   fr: {
     loading: 'Chargement...',
     error: 'Impossible de charger le statut de la course. Veuillez réessayer plus tard.',
     history: 'Historique',
     back: 'Retour',
+    language: 'Langue',
+    theme: 'Thème',
+    light: 'Clair',
+    dark: 'Sombre',
   },
   ar: {
     loading: 'جار التحميل...',
     error: 'تعذر تحميل حالة الرحلة. يرجى المحاولة مرة أخرى في وقت لاحق.',
     history: 'السجل',
     back: 'رجوع',
+    language: 'اللغة',
+    theme: 'المظهر',
+    light: 'فاتح',
+    dark: 'داكن',
   }
 };
 
 export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
-  // detect mobile to toggle the mobile-fullscreen booking layout
-  // use hook so we only enable the mobile fullscreen UI on small screens
-  // (previously BookRide was always forced into mobile fullscreen)
-  // This prevents the map from taking the entire dashboard on desktop.
   const isMobile = useIsMobile();
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [loadingRide, setLoadingRide] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user, language } = useAuth();
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+  const { user, language, setLanguage } = useAuth();
   const t = translations[language];
+
+  const toggleTheme = () => {
+    const newIsDark = !isDark;
+    setIsDark(newIsDark);
+    document.documentElement.classList.toggle('dark', newIsDark);
+    localStorage.setItem('theme', newIsDark ? 'dark' : 'light');
+  };
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -149,7 +179,33 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
             <span className="font-medium">{t.back}</span>
           </Button>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Language Toggle */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Globe className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setLanguage('en')} className={language === 'en' ? 'bg-accent' : ''}>
+                  English
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLanguage('fr')} className={language === 'fr' ? 'bg-accent' : ''}>
+                  Français
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLanguage('ar')} className={language === 'ar' ? 'bg-accent' : ''}>
+                  العربية
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Theme Toggle */}
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-9 w-9">
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+
+            {/* History */}
             <Sheet>
               <SheetTrigger asChild>
                 <Button 
