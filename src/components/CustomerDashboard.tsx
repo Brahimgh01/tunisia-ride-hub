@@ -56,19 +56,40 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
 
     const getActiveRide = async () => {
       try {
-        const { data, error: fetchError } = await supabase
+        // First check for active rides (not completed, not cancelled)
+        const { data: activeData, error: activeError } = await supabase
           .from('rides')
           .select('*')
           .eq('customer_id', user.id)
-          .in('status', ['pending', 'accepted', 'driver_en_route', 'driver_arrived', 'in_progress', 'completed'])
+          .in('status', ['pending', 'accepted', 'driver_en_route', 'driver_arrived', 'in_progress'])
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          throw fetchError;
+        if (activeError && activeError.code !== 'PGRST116') {
+          throw activeError;
         }
-        return data;
+        
+        if (activeData) return activeData;
+        
+        // If no active ride, check for recently completed rides (last 5 minutes) that need rating
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data: completedData, error: completedError } = await supabase
+          .from('rides')
+          .select('*')
+          .eq('customer_id', user.id)
+          .eq('status', 'completed')
+          .is('driver_rating', null) // Not yet rated
+          .gte('completed_at', fiveMinutesAgo)
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (completedError && completedError.code !== 'PGRST116') {
+          throw completedError;
+        }
+        
+        return completedData;
       } catch (error) {
         console.error("Error fetching active ride:", error);
         setError(t.error);

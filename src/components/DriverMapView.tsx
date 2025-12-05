@@ -341,10 +341,15 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   const acceptRide = async (rideId: string) => {
     const { error } = await supabase
       .from('rides')
-      .update({ status: 'accepted', driver_id: driverId })
+      .update({ 
+        status: 'accepted', 
+        driver_id: driverId,
+        accepted_at: new Date().toISOString()
+      })
       .eq('id', rideId);
 
     if (error) {
+      console.error('Accept ride error:', error);
       toast.error(t.acceptError);
     } else {
       toast.success(t.acceptSuccess);

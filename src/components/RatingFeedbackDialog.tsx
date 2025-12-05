@@ -89,11 +89,11 @@ export function RatingFeedbackDialog({ open, onOpenChange, rideId, language }: R
         .eq('id', rideId)
         .single();
 
-      if (rideError || !rideData?.driver_id) {
-        throw new Error('Could not find ride or driver');
+      if (rideError) {
+        throw new Error('Could not find ride');
       }
 
-      // Update the ride with rating
+      // Update the ride with rating - works even without driver
       const updates: any = {
         driver_rating: rating,
       };
@@ -109,20 +109,21 @@ export function RatingFeedbackDialog({ open, onOpenChange, rideId, language }: R
 
       if (updateError) throw updateError;
 
-      // Insert into ride_ratings table for driver's rating history
-      const { error: ratingError } = await supabase
-        .from('ride_ratings')
-        .insert({
-          ride_id: rideId,
-          driver_id: rideData.driver_id,
-          user_id: rideData.customer_id,
-          rating: rating,
-          comment: feedback.trim() || null,
-        });
+      // Only insert into ride_ratings if there was a driver
+      if (rideData?.driver_id) {
+        const { error: ratingError } = await supabase
+          .from('ride_ratings')
+          .insert({
+            ride_id: rideId,
+            driver_id: rideData.driver_id,
+            user_id: rideData.customer_id,
+            rating: rating,
+            comment: feedback.trim() || null,
+          });
 
-      if (ratingError) {
-        console.error('Error saving to ride_ratings:', ratingError);
-        // Don't fail the whole operation if this fails
+        if (ratingError) {
+          console.error('Error saving to ride_ratings:', ratingError);
+        }
       }
 
       toast({
