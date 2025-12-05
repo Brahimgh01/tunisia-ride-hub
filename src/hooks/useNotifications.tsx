@@ -37,9 +37,9 @@ export const useNotifications = (userId: string | undefined) => {
 
     fetchNotifications();
 
-    // Subscribe to real-time notifications
+    // Subscribe to real-time notifications with unique channel name
     const channel = supabase
-      .channel('notifications')
+      .channel(`notifications-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -50,7 +50,11 @@ export const useNotifications = (userId: string | undefined) => {
         },
         (payload) => {
           const newNotification = payload.new as Notification;
-          setNotifications(prev => [newNotification, ...prev]);
+          // Prevent duplicates by checking if notification already exists
+          setNotifications(prev => {
+            if (prev.some(n => n.id === newNotification.id)) return prev;
+            return [newNotification, ...prev];
+          });
           setUnreadCount(prev => prev + 1);
           
           // Show toast notification
