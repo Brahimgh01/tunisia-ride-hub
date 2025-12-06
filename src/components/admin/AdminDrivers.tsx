@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 
 interface Driver {
   user_id: string;
+  driver_id: string;
   full_name: string;
   phone: string;
   city: string;
@@ -55,18 +56,17 @@ export function AdminDrivers() {
       .in('user_id', driverUserIds);
 
     if (profiles) {
-      const driversWithDetails = await Promise.all(
-        profiles.map(async (profile) => {
-          const { data: driverProfile } = await supabase
-            .from('driver_profiles')
-            .select('*')
-            .eq('driver_id', profile.user_id)
-            .maybeSingle();
+      // Get all driver profiles in one query
+      const { data: driverProfiles } = await supabase
+        .from('driver_profiles')
+        .select('*')
+        .in('driver_id', driverUserIds);
 
-          return { ...profile, ...driverProfile };
-        })
-      );
-      setDrivers(driversWithDetails);
+      const driversWithDetails = profiles.map((profile) => {
+        const driverProfile = driverProfiles?.find(dp => dp.driver_id === profile.user_id);
+        return { ...profile, ...driverProfile, driver_id: profile.user_id };
+      });
+      setDrivers(driversWithDetails as Driver[]);
     }
   };
 
@@ -152,7 +152,7 @@ export function AdminDrivers() {
                       {!driver.is_verified ? (
                         <Button
                           size="sm"
-                          onClick={() => handleVerifyDriver(driver.user_id, true)}
+                          onClick={() => handleVerifyDriver(driver.driver_id || driver.user_id, true)}
                           className="bg-green-600 hover:bg-green-700"
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
@@ -162,7 +162,7 @@ export function AdminDrivers() {
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => handleVerifyDriver(driver.user_id, false)}
+                          onClick={() => handleVerifyDriver(driver.driver_id || driver.user_id, false)}
                         >
                           <XCircle className="h-4 w-4 mr-1" />
                           Unverify

@@ -20,6 +20,9 @@ export const useNotifications = (userId: string | undefined) => {
   useEffect(() => {
     if (!userId) return;
 
+    let isSubscribed = true;
+    const shownNotificationIds = new Set<string>();
+
     // Fetch existing notifications
     const fetchNotifications = async () => {
       const { data, error } = await supabase
@@ -29,7 +32,9 @@ export const useNotifications = (userId: string | undefined) => {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (data && !error) {
+      if (data && !error && isSubscribed) {
+        // Track existing notification IDs to prevent duplicate toasts
+        data.forEach(n => shownNotificationIds.add(n.id));
         setNotifications(data);
         setUnreadCount(data.filter(n => !n.is_read).length);
       }
@@ -38,8 +43,9 @@ export const useNotifications = (userId: string | undefined) => {
     fetchNotifications();
 
     // Subscribe to real-time notifications with unique channel name
+    const channelName = `notifications-user-${userId}-${Date.now()}`;
     const channel = supabase
-      .channel(`notifications-${userId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -49,8 +55,14 @@ export const useNotifications = (userId: string | undefined) => {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          if (!isSubscribed) return;
+          
           const newNotification = payload.new as Notification;
-          // Prevent duplicates by checking if notification already exists
+          
+          // Prevent duplicates
+          if (shownNotificationIds.has(newNotification.id)) return;
+          shownNotificationIds.add(newNotification.id);
+          
           setNotifications(prev => {
             if (prev.some(n => n.id === newNotification.id)) return prev;
             return [newNotification, ...prev];
@@ -67,6 +79,7 @@ export const useNotifications = (userId: string | undefined) => {
       .subscribe();
 
     return () => {
+      isSubscribed = false;
       supabase.removeChannel(channel);
     };
   }, [userId, toast]);
