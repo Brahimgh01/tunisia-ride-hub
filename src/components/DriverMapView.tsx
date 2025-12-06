@@ -252,6 +252,23 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
 
   const fetchPendingRides = async () => {
     console.log('📍 Fetching pending rides for driver:', driverId);
+    
+    // First check if driver has an active ride (accepted, en_route, arrived, in_progress)
+    const { data: activeRide } = await supabase
+      .from('rides')
+      .select('id, status')
+      .eq('driver_id', driverId)
+      .in('status', ['accepted', 'driver_en_route', 'driver_arrived', 'in_progress'])
+      .limit(1)
+      .maybeSingle();
+    
+    // If driver has an active ride, don't show any pending rides
+    if (activeRide) {
+      console.log('🚗 Driver has active ride, hiding pending rides');
+      setPendingRides([]);
+      return;
+    }
+    
     const { data, error } = await supabase
       .from('rides')
       .select('*')
@@ -260,7 +277,8 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       .limit(20);
 
     if (!error && data) {
-      // Prioritize rides assigned to this driver
+      // Only show rides assigned to this driver OR unassigned rides
+      // Rides assigned to OTHER drivers should not appear
       const assignedToMe = data.filter(r => r.driver_id === driverId);
       const unassigned = data.filter(r => !r.driver_id);
       const sortedRides = [...assignedToMe, ...unassigned];
@@ -339,22 +357,31 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   };
 
   const acceptRide = async (rideId: string) => {
-    const { error } = await supabase
-      .from('rides')
-      .update({ 
-        status: 'accepted', 
-        driver_id: driverId,
-        accepted_at: new Date().toISOString()
-      })
-      .eq('id', rideId);
+    // Accept ride and set driver as unavailable (busy)
+    const [rideResult, locationResult] = await Promise.all([
+      supabase
+        .from('rides')
+        .update({ 
+          status: 'accepted', 
+          driver_id: driverId,
+          accepted_at: new Date().toISOString()
+        })
+        .eq('id', rideId),
+      // Mark driver as busy (unavailable) so they don't appear on customer maps
+      supabase
+        .from('driver_locations')
+        .update({ is_available: false })
+        .eq('driver_id', driverId)
+    ]);
 
-    if (error) {
-      console.error('Accept ride error:', error);
+    if (rideResult.error) {
+      console.error('Accept ride error:', rideResult.error);
       toast.error(t.acceptError);
     } else {
       toast.success(t.acceptSuccess);
       setSelectedRide(null);
-      fetchPendingRides();
+      // Clear pending rides since driver is now busy
+      setPendingRides([]);
     }
   };
 

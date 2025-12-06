@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   DropdownMenu, 
@@ -11,9 +10,9 @@ import { Globe } from 'lucide-react';
 export type Language = 'ar' | 'fr' | 'en';
 
 const languages = {
-  ar: { name: 'العربية', flag: '🇹🇳' },
-  fr: { name: 'Français', flag: '🇫🇷' },
-  en: { name: 'English', flag: '🇺🇸' }
+  ar: { name: 'العربية' },
+  fr: { name: 'Français' },
+  en: { name: 'English' }
 };
 
 interface LanguageToggleProps {
@@ -25,10 +24,8 @@ export function LanguageToggle({ currentLanguage, onLanguageChange }: LanguageTo
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="ghost" size="icon" className="h-9 w-9">
           <Globe className="h-4 w-4" />
-          <span className="hidden sm:inline">{languages[currentLanguage].name}</span>
-          <span className="text-lg">{languages[currentLanguage].flag}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -36,10 +33,9 @@ export function LanguageToggle({ currentLanguage, onLanguageChange }: LanguageTo
           <DropdownMenuItem 
             key={code}
             onClick={() => onLanguageChange(code as Language)}
-            className="gap-2"
+            className={currentLanguage === code ? 'bg-accent' : ''}
           >
-            <span className="text-lg">{lang.flag}</span>
-            <span>{lang.name}</span>
+            {lang.name}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
