@@ -413,12 +413,28 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
     setLoading(false);
   };
 
-  const handleCallDriver = () => {
+  const handleCallDriver = async () => {
+    // First try to get phone from ride.driver
     if (ride?.driver && 'phone' in ride.driver && ride.driver.phone) {
       window.location.href = `tel:${ride.driver.phone}`;
-    } else {
-      toast.error(t.driverPhoneNotAvailable);
+      return;
     }
+    
+    // If not available, fetch from profiles table directly
+    if (ride?.driver_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('user_id', ride.driver_id)
+        .single();
+      
+      if (profile?.phone) {
+        window.location.href = `tel:${profile.phone}`;
+        return;
+      }
+    }
+    
+    toast.error(t.driverPhoneNotAvailable);
   };
 
   const getStatusDisplay = (status: string) => {

@@ -1,39 +1,39 @@
 import { useAuth } from '@/hooks/useAuth';
 import DriverDashboard from '@/components/DriverDashboard';
 import { Navigate } from 'react-router-dom';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Moon, Sun, LogOut } from 'lucide-react';
-
-// Theme toggle hook
-function useTheme() {
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark');
-    }
-    return false;
-  });
-
-  const toggleTheme = () => {
-    const newTheme = !isDark;
-    setIsDark(newTheme);
-    document.documentElement.classList.toggle('dark', newTheme);
-  };
-
-  return { isDark, toggleTheme };
-}
+import { Moon, Sun, LogOut, Globe } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function DriverDashboardPage() {
   const { user, profile, language, signOut, setLanguage, isLoading } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newIsDark = !isDark;
+    setIsDark(newIsDark);
+    document.documentElement.classList.toggle('dark', newIsDark);
+    localStorage.setItem('theme', newIsDark ? 'dark' : 'light');
+  };
 
   // Redirect if not authenticated or not a driver
   if (!isLoading && (!user || !profile)) {
     return <Navigate to="/" replace />;
   }
-
-  // Allow access regardless of role - user can be both customer and driver
 
   if (isLoading) {
     return (
@@ -51,33 +51,43 @@ export default function DriverDashboardPage() {
   return (
     <div className="min-h-screen bg-gradient-warm relative">
       {/* Header with controls */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+      <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon"
           onClick={signOut}
-          className="bg-background/80 backdrop-blur-sm text-destructive hover:text-destructive-foreground hover:bg-destructive"
+          className="h-9 w-9 text-destructive hover:text-destructive-foreground hover:bg-destructive"
         >
           <LogOut className="h-4 w-4" />
         </Button>
+        
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon"
           onClick={toggleTheme}
-          className="bg-background/80 backdrop-blur-sm"
+          className="h-9 w-9"
         >
           {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
-        <Select value={language} onValueChange={setLanguage}>
-          <SelectTrigger className="w-16 bg-background/80 backdrop-blur-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="en">🇺🇸</SelectItem>
-            <SelectItem value="fr">🇫🇷</SelectItem>
-            <SelectItem value="ar">🇹🇳</SelectItem>
-          </SelectContent>
-        </Select>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Globe className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setLanguage('en')} className={language === 'en' ? 'bg-accent' : ''}>
+              English
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('fr')} className={language === 'fr' ? 'bg-accent' : ''}>
+              Français
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('ar')} className={language === 'ar' ? 'bg-accent' : ''}>
+              العربية
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       
       <DriverDashboard />
