@@ -357,31 +357,52 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   };
 
   const acceptRide = async (rideId: string) => {
-    // Accept ride and set driver as unavailable (busy)
-    const [rideResult, locationResult] = await Promise.all([
-      supabase
+    try {
+      // Only accept if the ride is still pending AND (unassigned OR already assigned to me)
+      const { data: updated, error: rideError } = await supabase
         .from('rides')
-        .update({ 
-          status: 'accepted', 
+        .update({
+          status: 'accepted',
           driver_id: driverId,
-          accepted_at: new Date().toISOString()
+          accepted_at: new Date().toISOString(),
         })
-        .eq('id', rideId),
+        .eq('id', rideId)
+        .eq('status', 'pending')
+        .or(`driver_id.is.null,driver_id.eq.${driverId}`)
+        .select('id, status, driver_id');
+
+      if (rideError) {
+        console.error('Accept ride error:', rideError);
+        toast.error(t.acceptError);
+        return;
+      }
+
+      const updatedRows = Array.isArray(updated) ? updated : updated ? [updated] : [];
+      if (updatedRows.length === 0) {
+        toast.error(language === 'ar'
+          ? 'هذه الرحلة لم تعد متاحة'
+          : language === 'fr'
+          ? 'Cette course n\'est plus disponible'
+          : 'This ride is no longer available');
+        return;
+      }
+
       // Mark driver as busy (unavailable) so they don't appear on customer maps
-      supabase
+      const { error: locationError } = await supabase
         .from('driver_locations')
         .update({ is_available: false })
-        .eq('driver_id', driverId)
-    ]);
+        .eq('driver_id', driverId);
 
-    if (rideResult.error) {
-      console.error('Accept ride error:', rideResult.error);
-      toast.error(t.acceptError);
-    } else {
+      if (locationError) {
+        console.warn('Driver location busy update failed:', locationError);
+      }
+
       toast.success(t.acceptSuccess);
       setSelectedRide(null);
-      // Clear pending rides since driver is now busy
       setPendingRides([]);
+    } catch (err) {
+      console.error('Accept ride unexpected error:', err);
+      toast.error(t.acceptError);
     }
   };
 
