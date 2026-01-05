@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,12 +17,30 @@ export const useNotifications = (userId: string | undefined) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
   
-  // Use refs to prevent duplicate toasts across re-renders
+  // Use refs to prevent duplicate toasts across re-renders and hot reloads
   const shownNotificationIds = useRef(new Set<string>());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const isInitialized = useRef(false);
+
+  // Memoize toast to avoid re-subscriptions
+  const showToast = useCallback((title: string, description: string, id: string) => {
+    // Additional check to prevent duplicates
+    if (shownNotificationIds.current.has(`toast-${id}`)) return;
+    shownNotificationIds.current.add(`toast-${id}`);
+    
+    toast({
+      title,
+      description,
+    });
+  }, [toast]);
 
   useEffect(() => {
     if (!userId) return;
+
+    // Prevent duplicate subscriptions on hot reload
+    if (isInitialized.current && channelRef.current) {
+      return;
+    }
 
     // Cleanup any existing channel first
     if (channelRef.current) {
@@ -31,6 +49,7 @@ export const useNotifications = (userId: string | undefined) => {
     }
 
     let isSubscribed = true;
+    isInitialized.current = true;
 
     // Fetch existing notifications
     const fetchNotifications = async () => {
@@ -52,7 +71,7 @@ export const useNotifications = (userId: string | undefined) => {
     fetchNotifications();
 
     // Subscribe to real-time notifications with stable channel name
-    const channelName = `notifications-user-${userId}`;
+    const channelName = `notifications-user-${userId}-${Date.now()}`;
     const channel = supabase
       .channel(channelName)
       .on(
@@ -78,11 +97,8 @@ export const useNotifications = (userId: string | undefined) => {
           });
           setUnreadCount(prev => prev + 1);
           
-          // Show toast notification
-          toast({
-            title: newNotification.title,
-            description: newNotification.message,
-          });
+          // Show toast notification with unique ID check
+          showToast(newNotification.title, newNotification.message, newNotification.id);
         }
       )
       .subscribe();
@@ -91,12 +107,13 @@ export const useNotifications = (userId: string | undefined) => {
 
     return () => {
       isSubscribed = false;
+      isInitialized.current = false;
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
-  }, [userId]); // Removed toast from deps to prevent re-subscriptions
+  }, [userId, showToast]);
 
   const markAsRead = async (notificationId: string) => {
     const { error } = await supabase
