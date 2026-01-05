@@ -142,19 +142,45 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
 
 
   // Accept a pending ride
-  // Accept a pending ride
   const acceptRide = async (rideId: string) => {
     if (!user) return;
-    const { error } = await supabase
+
+    const { data: updated, error } = await supabase
       .from('rides')
-      .update({ status: 'accepted', driver_id: user.id })
-      .eq('id', rideId);
+      .update({
+        status: 'accepted',
+        driver_id: user.id,
+        accepted_at: new Date().toISOString(),
+      })
+      .eq('id', rideId)
+      .eq('status', 'pending')
+      .or(`driver_id.is.null,driver_id.eq.${user.id}`)
+      .select('id');
+
     if (error) {
+      console.error('Failed to accept ride:', error);
       toast.error('Failed to accept ride');
-    } else {
-      toast.success('Ride accepted');
-      fetchRides();
+      return;
     }
+
+    const updatedRows = Array.isArray(updated) ? updated : updated ? [updated] : [];
+    if (updatedRows.length === 0) {
+      toast.error('This ride is no longer available');
+      return;
+    }
+
+    // Mark driver as busy (unavailable) so they don't appear in availability pools
+    const { error: locationError } = await supabase
+      .from('driver_locations')
+      .update({ is_available: false })
+      .eq('driver_id', user.id);
+
+    if (locationError) {
+      console.warn('Driver location busy update failed:', locationError);
+    }
+
+    toast.success('Ride accepted');
+    fetchRides();
   };
 
   // Update ride status for active ride
