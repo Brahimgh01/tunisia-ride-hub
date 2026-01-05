@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { MapPin, CheckCircle, Navigation, Car, Calendar, CreditCard, Star } from 'lucide-react';
+import { MapPin, CheckCircle, Navigation, Car, Calendar, CreditCard, Star, XCircle } from 'lucide-react';
 import RideChat from './RideChat';
 import { Ride, RideRating } from '@/lib/types';
 
@@ -37,6 +37,9 @@ const translations = {
     arrived: 'Arrived',
     startRide: 'Start Ride',
     complete: 'Complete Ride',
+    cancelRide: 'Cancel Ride',
+    cancelSuccess: 'Ride released, searching for another driver',
+    cancelError: 'Failed to cancel ride',
     from: 'From',
     to: 'To',
     rideType: 'Type',
@@ -69,6 +72,9 @@ const translations = {
     arrived: 'وصلت',
     startRide: 'بدء الرحلة',
     complete: 'إنهاء الرحلة',
+    cancelRide: 'إلغاء الرحلة',
+    cancelSuccess: 'تم تحرير الرحلة، جاري البحث عن سائق آخر',
+    cancelError: 'فشل إلغاء الرحلة',
     from: 'من',
     to: 'إلى',
     rideType: 'النوع',
@@ -101,6 +107,9 @@ const translations = {
     arrived: 'Arrivé',
     startRide: 'Démarrer',
     complete: 'Terminer',
+    cancelRide: 'Annuler la course',
+    cancelSuccess: 'Course libérée, recherche d\'un autre chauffeur',
+    cancelError: 'Échec de l\'annulation',
     from: 'De',
     to: 'À',
     rideType: 'Type',
@@ -204,6 +213,37 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
       toast.success('Status updated');
       fetchRides();
     }
+  };
+
+  // Cancel ride - returns it to pending status for another driver
+  const cancelRide = async () => {
+    if (!user || !activeRide) return;
+    
+    const { error } = await supabase
+      .from('rides')
+      .update({
+        status: 'pending',
+        driver_id: null,
+        accepted_at: null,
+      })
+      .eq('id', activeRide.id)
+      .eq('driver_id', user.id);
+    
+    if (error) {
+      console.error('Failed to cancel ride:', error);
+      toast.error(t.cancelError);
+      return;
+    }
+
+    // Mark driver as available again
+    await supabase
+      .from('driver_locations')
+      .update({ is_available: true })
+      .eq('driver_id', user.id);
+
+    toast.success(t.cancelSuccess);
+    setActiveRide(null);
+    fetchRides();
   };
 
   const fetchDriverRating = async () => {
@@ -445,7 +485,7 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
                 </div>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {activeRide.status === 'accepted' && (
                 <Button onClick={() => updateRideStatus('driver_en_route')} className="flex-1">
                   <Navigation className="h-4 w-4 mr-2" />
@@ -466,6 +506,13 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
                 <Button onClick={() => updateRideStatus('completed')} className="flex-1">
                   <CheckCircle className="h-4 w-4 mr-2" />
                   {t.complete}
+                </Button>
+              )}
+              {/* Cancel button - available before ride starts */}
+              {['accepted', 'driver_en_route', 'driver_arrived'].includes(activeRide.status) && (
+                <Button onClick={cancelRide} variant="destructive">
+                  <XCircle className="h-4 w-4 mr-2" />
+                  {t.cancelRide}
                 </Button>
               )}
             </div>
