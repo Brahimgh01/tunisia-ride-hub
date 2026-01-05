@@ -172,7 +172,7 @@ export default function DriverDashboard() {
               console.error('Error fetching driver profile:', driverError);
             }
 
-            // Only consider registered if all required fields are present and verified
+            // Only consider registered if all required fields are present
             const requiredFields = [
               'vehicle_type',
               'vehicle_model',
@@ -184,12 +184,12 @@ export default function DriverDashboard() {
               'vehicle_registration_document_url'
             ];
             const hasAllFields = driverData && requiredFields.every(f => driverData[f]);
-            const isProfileVerified = driverData && driverData.is_verified;
 
-            if (hasAllFields && isProfileVerified) {
+            if (hasAllFields) {
               setIsRegistered(true);
               setIsVerified(driverData.is_verified || false);
-              setIsAvailable(driverData.is_available || false);
+              // If not verified, force offline
+              setIsAvailable(driverData.is_verified ? (driverData.is_available || false) : false);
               await fetchDriverStats();
               await fetchSubscription();
             } else {
@@ -465,13 +465,19 @@ export default function DriverDashboard() {
                     id="availability-switch"
                     checked={isAvailable}
                     onCheckedChange={handleAvailabilityChange}
-                    disabled={!subscription.isActive}
+                    disabled={!subscription.isActive || !isVerified}
                   />
                   <Label htmlFor="availability-switch" className="cursor-pointer font-medium">
                     {t.availability}
                   </Label>
                 </div>
-                {!subscription.isActive && (
+                {!isVerified && (
+                  <div className="text-xs mt-2 p-2 bg-red-500/10 rounded border border-red-500/20">
+                    <p className="text-red-600 dark:text-red-400 font-medium">⚠️ {language === 'ar' ? 'الحساب موقوف' : language === 'fr' ? 'Compte suspendu' : 'Account Suspended'}</p>
+                    <p className="text-muted-foreground mt-1">{language === 'ar' ? 'حسابك غير موثق حاليًا. تواصل مع الدعم.' : language === 'fr' ? 'Votre compte n\'est pas vérifié. Contactez le support.' : 'Your account is not verified. Contact support.'}</p>
+                  </div>
+                )}
+                {isVerified && !subscription.isActive && (
                   <div className="text-xs mt-2 p-2 bg-red-500/10 rounded border border-red-500/20">
                     <p className="text-red-600 dark:text-red-400 font-medium">⚠️ {t?.subscriptionRequired}</p>
                     <p className="text-muted-foreground mt-1">{t?.renewSubscription}</p>
