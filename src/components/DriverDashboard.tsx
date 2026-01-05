@@ -342,6 +342,37 @@ export default function DriverDashboard() {
     console.log('🔄 Changing availability:', { userId: user.id, available });
     setIsAvailable(available);
 
+    // If going offline, release any active ride back to pending
+    if (!available) {
+      const { data: activeRides, error: fetchError } = await supabase
+        .from('rides')
+        .select('id')
+        .eq('driver_id', user.id)
+        .in('status', ['accepted', 'driver_en_route', 'driver_arrived']);
+
+      if (!fetchError && activeRides && activeRides.length > 0) {
+        // Release rides back to pending for another driver
+        const { error: releaseError } = await supabase
+          .from('rides')
+          .update({
+            status: 'pending',
+            driver_id: null,
+            accepted_at: null,
+          })
+          .eq('driver_id', user.id)
+          .in('status', ['accepted', 'driver_en_route', 'driver_arrived']);
+
+        if (!releaseError) {
+          console.log('✅ Active rides released back to pending');
+          toast.info(language === 'ar' 
+            ? 'تم تحرير الرحلات للسائقين الآخرين' 
+            : language === 'fr' 
+            ? 'Courses libérées pour d\'autres chauffeurs' 
+            : 'Rides released for other drivers');
+        }
+      }
+    }
+
     // Update BOTH driver_profiles AND driver_locations simultaneously
     const [profileResult, locationResult] = await Promise.all([
       supabase
