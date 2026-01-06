@@ -148,6 +148,7 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
   const [driverRating, setDriverRating] = useState<DriverRating | null>(null);
   const [loading, setLoading] = useState(true);
   const t = translations[language as keyof typeof translations] || translations.en;
+  const lang = language as keyof typeof translations;
 
 
   // Accept a pending ride
@@ -219,6 +220,9 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
   const cancelRide = async () => {
     if (!user || !activeRide) return;
     
+    const customerId = activeRide.customer_id;
+    const rideId = activeRide.id;
+    
     const { error } = await supabase
       .from('rides')
       .update({
@@ -226,7 +230,7 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
         driver_id: null,
         accepted_at: null,
       })
-      .eq('id', activeRide.id)
+      .eq('id', rideId)
       .eq('driver_id', user.id);
     
     if (error) {
@@ -240,6 +244,21 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
       .from('driver_locations')
       .update({ is_available: true })
       .eq('driver_id', user.id);
+
+    // Send notification to customer that driver cancelled
+    await supabase
+      .from('notifications')
+      .insert({
+        user_id: customerId,
+        title: lang === 'ar' ? 'إلغاء السائق' : lang === 'fr' ? 'Chauffeur annulé' : 'Driver Cancelled',
+        message: lang === 'ar' 
+          ? 'قام السائق بإلغاء الرحلة. جاري البحث عن سائق آخر...'
+          : lang === 'fr' 
+          ? 'Le chauffeur a annulé. Recherche d\'un autre chauffeur...'
+          : 'The driver cancelled the ride. Searching for another driver...',
+        type: 'ride_update',
+        ride_id: rideId,
+      });
 
     toast.success(t.cancelSuccess);
     setActiveRide(null);
