@@ -245,20 +245,7 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
       .update({ is_available: true })
       .eq('driver_id', user.id);
 
-    // Send notification to customer that driver cancelled
-    await supabase
-      .from('notifications')
-      .insert({
-        user_id: customerId,
-        title: lang === 'ar' ? 'إلغاء السائق' : lang === 'fr' ? 'Chauffeur annulé' : 'Driver Cancelled',
-        message: lang === 'ar' 
-          ? 'قام السائق بإلغاء الرحلة. جاري البحث عن سائق آخر...'
-          : lang === 'fr' 
-          ? 'Le chauffeur a annulé. Recherche d\'un autre chauffeur...'
-          : 'The driver cancelled the ride. Searching for another driver...',
-        type: 'ride_update',
-        ride_id: rideId,
-      });
+    // Customer notification is handled by the DB trigger (notify_ride_status_change)
 
     toast.success(t.cancelSuccess);
     setActiveRide(null);
