@@ -673,7 +673,7 @@ export default function DriverDashboard() {
         <Separator />
 
         {/* Ride Management */}
-        <DriverRideManagement language={language} />
+        <DriverRideManagement language={language} isOnline={isAvailable} />
       </div>
     </div>
   );

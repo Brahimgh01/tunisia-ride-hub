@@ -24,6 +24,7 @@ interface DriverRating {
 
 interface DriverRideManagementProps {
   language: string;
+  isOnline: boolean;
 }
 
 const translations = {
@@ -60,7 +61,10 @@ const translations = {
       konnect: 'Konnect',
       edinar: 'E-Dinar',
       card: 'Card',
-    }
+    },
+    offlineTitle: 'You are offline',
+    offlineSubtitle: 'Go online to see ride requests',
+    goOnlineToAccept: 'Go online to accept rides',
   },
   ar: {
     pending: 'الطلبات المعلقة',
@@ -95,7 +99,10 @@ const translations = {
       konnect: 'كونكت',
       edinar: 'إي-دينار',
       card: 'بطاقة',
-    }
+    },
+    offlineTitle: 'أنت غير متصل',
+    offlineSubtitle: 'اتصل لرؤية طلبات الرحلات',
+    goOnlineToAccept: 'اتصل لقبول الرحلات',
   },
   fr: {
     pending: 'Demandes en attente',
@@ -130,11 +137,14 @@ const translations = {
       konnect: 'Konnect',
       edinar: 'E-Dinar',
       card: 'Carte',
-    }
+    },
+    offlineTitle: 'Vous êtes hors ligne',
+    offlineSubtitle: 'Passez en ligne pour voir les demandes',
+    goOnlineToAccept: 'Passez en ligne pour accepter',
   }
 };
 
-const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
+const DriverRideManagement = ({ language, isOnline }: DriverRideManagementProps) => {
   // Ask for notification permission on mount
   useEffect(() => {
     if (window.Notification && Notification.permission === 'default') {
@@ -154,6 +164,10 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
   // Accept a pending ride
   const acceptRide = async (rideId: string) => {
     if (!user) return;
+    if (!isOnline) {
+      toast.error(t.goOnlineToAccept);
+      return;
+    }
 
     const { data: updated, error } = await supabase
       .from('rides')
@@ -293,16 +307,7 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
   const fetchRides = async () => {
     if (!user) return;
     setLoading(true);
-    
-    // Pending rides assigned to this driver OR unassigned nearby rides
-    const { data: pending, error: pendingError } = await supabase
-      .from('rides')
-      .select('*')
-      .eq('status', 'pending')
-      .or(`driver_id.eq.${user.id},driver_id.is.null`)
-      .order('created_at', { ascending: true })
-      .limit(10);
-    
+
     // Active ride (accepted or in progress for this driver)
     const { data: active, error: activeError } = await supabase
       .from('rides')
@@ -311,17 +316,33 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
       .eq('driver_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1);
-    
-    if (!pendingError) {
-      // Prioritize rides assigned to this driver
-      const assignedToMe = (pending as unknown as Ride[] || []).filter(r => r.driver_id === user.id);
-      const unassigned = (pending as unknown as Ride[] || []).filter(r => !r.driver_id);
-      setPendingRides([...assignedToMe, ...unassigned]);
+
+    const nextActiveRide = !activeError && active && active.length > 0 ? (active[0] as unknown as Ride) : null;
+    setActiveRide(nextActiveRide);
+
+    // Keep the list + map behavior consistent:
+    // - If driver has an active ride, hide pending pool
+    // - If driver is offline, hide pending pool
+    if (nextActiveRide || !isOnline) {
+      setPendingRides([]);
+    } else {
+      // Pending rides assigned to this driver OR unassigned rides
+      const { data: pending, error: pendingError } = await supabase
+        .from('rides')
+        .select('*')
+        .eq('status', 'pending')
+        .or(`driver_id.eq.${user.id},driver_id.is.null`)
+        .order('created_at', { ascending: true })
+        .limit(10);
+
+      if (!pendingError) {
+        // Prioritize rides assigned to this driver
+        const assignedToMe = (pending as unknown as Ride[] | null || []).filter((r) => r.driver_id === user.id);
+        const unassigned = (pending as unknown as Ride[] | null || []).filter((r) => !r.driver_id);
+        setPendingRides([...assignedToMe, ...unassigned]);
+      }
     }
-    
-    if (!activeError && active && active.length > 0) setActiveRide(active[0] as unknown as Ride | null);
-    else setActiveRide(null);
-    
+
     fetchCompletedRides();
     fetchDriverRating();
     setLoading(false);
@@ -332,73 +353,93 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
 
   useEffect(() => {
     if (!user) return;
-    
+
     // Request notification permission
     if (window.Notification && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    
+
     fetchRides();
 
-    // Subscribe to real-time ride updates
-    const channel = supabase
-      .channel('driver-ride-changes')
-      // Listen for rides assigned to this driver
+    // --- Realtime: driver-specific updates (always on) ---
+    const driverChannel = supabase
+      .channel(`driver-ride-changes-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'rides',
-          filter: `driver_id=eq.${user.id}`
+          filter: `driver_id=eq.${user.id}`,
         },
         (payload) => {
           const ride = payload.new as Ride;
-          
-          // Show notification for ride assigned to this driver
-          if (payload.eventType === 'UPDATE' && ride.driver_id === user.id) {
-            showNotification('🎯 Ride Assigned to You!', { 
+
+          // Only show assignment notification if it was newly assigned to me
+          const oldDriverId = (payload.old as any)?.driver_id as string | undefined;
+          if (payload.eventType === 'UPDATE' && ride.driver_id === user.id && oldDriverId !== user.id) {
+            showNotification('🎯 Ride Assigned to You!', {
               body: `New ride from ${ride.pickup_location}`,
               icon: '/favicon.ico',
-              requireInteraction: true
+              requireInteraction: true,
             });
             toast.success('New ride assigned to you!', {
               description: 'Check your pending requests',
-              duration: 5000
+              duration: 5000,
             });
           }
-          
-          if (ride && ride.status && prevStatusRef.current !== ride.status) {
-            showNotification('Ride Status Updated', { 
+
+          if (ride?.status && prevStatusRef.current !== ride.status) {
+            showNotification('Ride Status Updated', {
               body: `Status: ${ride.status}`,
-              icon: '/favicon.ico'
+              icon: '/favicon.ico',
             });
             prevStatusRef.current = ride.status;
           }
-          fetchRides();
-        }
-      )
-      // Listen for ALL new pending rides (general pool)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'rides',
-          filter: `status=eq.pending`
-        },
-        (payload) => {
-          const ride = payload.new as Ride;
-          showNotification('🚗 New Ride Request Available!', { 
-            body: `From: ${ride.pickup_location}`,
-            icon: '/favicon.ico',
-            requireInteraction: true
-          });
-          toast.info('New ride request in your area!');
+
           fetchRides();
         }
       )
       .subscribe();
+
+    // --- Realtime: pending pool (only when online) ---
+    const pendingChannel = isOnline
+      ? supabase
+          .channel(`pending-rides-${user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'rides',
+              filter: 'status=eq.pending',
+            },
+            (payload) => {
+              const ride = payload.new as Ride;
+              showNotification('🚗 New Ride Request Available!', {
+                body: `From: ${ride.pickup_location}`,
+                icon: '/favicon.ico',
+                requireInteraction: true,
+              });
+              toast.info('New ride request in your area!');
+              fetchRides();
+            }
+          )
+          // Important: this keeps the list in sync when a ride becomes pending again (e.g. driver cancels)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'rides',
+              filter: 'status=eq.pending',
+            },
+            () => {
+              fetchRides();
+            }
+          )
+          .subscribe()
+      : null;
 
     // Subscribe to chat messages for active ride
     let chatChannel: any = null;
@@ -409,7 +450,7 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'ride_chat_messages', filter: `ride_id=eq.${activeRide.id}` },
           (payload) => {
-            const msg = payload.new;
+            const msg = payload.new as any;
             if (msg && msg.sender_id !== user.id) {
               showNotification('New chat message', { body: msg.message });
             }
@@ -419,11 +460,11 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
     }
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(driverChannel);
+      if (pendingChannel) supabase.removeChannel(pendingChannel);
       if (chatChannel) supabase.removeChannel(chatChannel);
     };
-    // eslint-disable-next-line
-  }, [user, activeRide?.id]);
+  }, [user, isOnline, activeRide?.id]);
 
   if (loading) {
     return <div className="p-6">Loading...</div>;
@@ -533,7 +574,15 @@ const DriverRideManagement = ({ language }: DriverRideManagementProps) => {
 
       <div>
         <h2 className="text-2xl font-bold mb-4">{t.pending}</h2>
-        {pendingRides.length === 0 ? (
+
+        {!isOnline && !activeRide ? (
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <p className="font-medium">{t.offlineTitle}</p>
+              <p className="text-sm text-muted-foreground mt-1">{t.offlineSubtitle}</p>
+            </CardContent>
+          </Card>
+        ) : pendingRides.length === 0 ? (
           <Card>
             <CardContent className="pt-6 text-center text-muted-foreground">
               {t.noRides}
