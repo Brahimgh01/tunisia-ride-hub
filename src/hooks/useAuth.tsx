@@ -142,7 +142,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    const currentUser = user;
+
     try {
+      // Best-effort: if the user is a driver, force them offline + release any active ride
+      if (currentUser) {
+        await Promise.allSettled([
+          supabase
+            .from('rides')
+            .update({
+              status: 'pending',
+              driver_id: null,
+              accepted_at: null,
+            })
+            .eq('driver_id', currentUser.id)
+            .in('status', ['accepted', 'driver_en_route', 'driver_arrived', 'in_progress']),
+          supabase
+            .from('driver_profiles')
+            .update({ is_available: false })
+            .eq('driver_id', currentUser.id),
+          supabase
+            .from('driver_locations')
+            .update({ is_available: false, last_updated: new Date().toISOString() })
+            .eq('driver_id', currentUser.id),
+        ]);
+      }
+
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Sign out error:', error);

@@ -41,6 +41,7 @@ export default function DriverDashboard() {
   const [isRegistered, setIsRegistered] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [isAvailable, setIsAvailable] = useState(false);
+  const [availabilityUpdating, setAvailabilityUpdating] = useState(false);
   const [location, setLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -338,68 +339,80 @@ export default function DriverDashboard() {
 
   const handleAvailabilityChange = async (available: boolean) => {
     if (!user || !profile) return;
+    if (availabilityUpdating) return;
+
+    const prev = isAvailable;
+    setAvailabilityUpdating(true);
 
     console.log('🔄 Changing availability:', { userId: user.id, available });
-    setIsAvailable(available);
 
-    // If going offline, release any active ride back to pending
-    if (!available) {
-      const { data: activeRides, error: fetchError } = await supabase
-        .from('rides')
-        .select('id')
-        .eq('driver_id', user.id)
-        .in('status', ['accepted', 'driver_en_route', 'driver_arrived']);
-
-      if (!fetchError && activeRides && activeRides.length > 0) {
-        // Release rides back to pending for another driver
-        const { error: releaseError } = await supabase
+    try {
+      // If going offline, release any active ride back to pending FIRST (so list + map stay consistent)
+      if (!available) {
+        const { data: activeRides, error: fetchError } = await supabase
           .from('rides')
-          .update({
-            status: 'pending',
-            driver_id: null,
-            accepted_at: null,
-          })
+          .select('id')
           .eq('driver_id', user.id)
-          .in('status', ['accepted', 'driver_en_route', 'driver_arrived']);
+          .in('status', ['accepted', 'driver_en_route', 'driver_arrived', 'in_progress']);
 
-        if (!releaseError) {
-          console.log('✅ Active rides released back to pending');
-          toast.info(language === 'ar' 
-            ? 'تم تحرير الرحلات للسائقين الآخرين' 
-            : language === 'fr' 
-            ? 'Courses libérées pour d\'autres chauffeurs' 
-            : 'Rides released for other drivers');
+        if (!fetchError && activeRides && activeRides.length > 0) {
+          const { error: releaseError } = await supabase
+            .from('rides')
+            .update({
+              status: 'pending',
+              driver_id: null,
+              accepted_at: null,
+            })
+            .eq('driver_id', user.id)
+            .in('status', ['accepted', 'driver_en_route', 'driver_arrived', 'in_progress']);
+
+          if (!releaseError) {
+            console.log('✅ Active rides released back to pending');
+            toast.info(
+              language === 'ar'
+                ? 'تم تحرير الرحلات للسائقين الآخرين'
+                : language === 'fr'
+                  ? "Courses libérées pour d'autres chauffeurs"
+                  : 'Rides released for other drivers'
+            );
+          } else {
+            console.error('❌ Failed to release active rides:', releaseError);
+          }
         }
       }
-    }
 
-    // Update BOTH driver_profiles AND driver_locations simultaneously
-    const [profileResult, locationResult] = await Promise.all([
-      supabase
-        .from('driver_profiles')
-        .update({ is_available: available })
-        .eq('driver_id', user.id),
-      // Always update driver_locations immediately
-      supabase
-        .from('driver_locations')
-        .upsert({
-          driver_id: user.id,
-          latitude: location?.lat || 36.8065,
-          longitude: location?.lng || 10.1815,
-          is_available: available,
-          last_updated: new Date().toISOString()
-        }, { onConflict: 'driver_id' })
-    ]);
+      // Update BOTH driver_profiles AND driver_locations
+      const [profileResult, locationResult] = await Promise.all([
+        supabase
+          .from('driver_profiles')
+          .update({ is_available: available })
+          .eq('driver_id', user.id),
+        supabase
+          .from('driver_locations')
+          .upsert(
+            {
+              driver_id: user.id,
+              latitude: location?.lat || 36.8065,
+              longitude: location?.lng || 10.1815,
+              is_available: available,
+              last_updated: new Date().toISOString(),
+            },
+            { onConflict: 'driver_id' }
+          ),
+      ]);
 
-    if (profileResult.error || locationResult.error) {
-      console.error('❌ Error updating availability:', profileResult.error || locationResult.error);
-      toast.error('Failed to update availability');
-      setIsAvailable(!available);
-    } else {
+      if (profileResult.error || locationResult.error) {
+        console.error('❌ Error updating availability:', profileResult.error || locationResult.error);
+        toast.error('Failed to update availability');
+        setIsAvailable(prev);
+        return;
+      }
+
+      setIsAvailable(available);
       console.log('✅ Availability updated in both tables');
       toast.success(`You are now ${available ? 'online' : 'offline'}`);
-      
-      // If going online, start tracking location
+
+      // If going online, immediately refresh + seed location once
       if (available && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -410,6 +423,8 @@ export default function DriverDashboard() {
           (err) => console.error('Location error:', err)
         );
       }
+    } finally {
+      setAvailabilityUpdating(false);
     }
   };
 
@@ -496,7 +511,7 @@ export default function DriverDashboard() {
                     id="availability-switch"
                     checked={isAvailable}
                     onCheckedChange={handleAvailabilityChange}
-                    disabled={!subscription.isActive || !isVerified}
+                    disabled={availabilityUpdating || !subscription.isActive || !isVerified}
                   />
                   <Label htmlFor="availability-switch" className="cursor-pointer font-medium">
                     {t.availability}
