@@ -183,13 +183,16 @@ const DriverRideManagement = ({ language, isOnline }: DriverRideManagementProps)
 
     if (error) {
       console.error('Failed to accept ride:', error);
-      toast.error('Failed to accept ride');
+      toast.error(error.message || 'Failed to accept ride');
+      // Force a refresh so the list stays in sync with the map
+      fetchRides();
       return;
     }
 
     const updatedRows = Array.isArray(updated) ? updated : updated ? [updated] : [];
     if (updatedRows.length === 0) {
       toast.error('This ride is no longer available');
+      fetchRides();
       return;
     }
 
