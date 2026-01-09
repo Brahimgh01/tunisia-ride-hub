@@ -1,21 +1,22 @@
-import { useState, useEffect } from 'react';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import BookRide from './BookRide';
-import RideStatus from './RideStatus';
 import { NotificationBell } from './NotificationBell';
-import { ArrowLeft, History, MapPin, Sun, Moon, Globe } from 'lucide-react';
+import RideStatus from './RideStatus';
+import { History, Sun, Moon, Globe, Navigation, Wallet, Menu, X } from 'lucide-react';
 import { useAuth, Language } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Ride } from '@/lib/types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import RideHistory from './RideHistory';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import CustomerMapView from './CustomerMapView';
 
 interface CustomerDashboardProps {
   onBack: () => void;
@@ -26,42 +27,77 @@ const translations = {
     loading: 'Loading...',
     error: 'Could not load ride status. Please try again later.',
     history: 'Ride History',
-    back: 'Back',
-    language: 'Language',
-    theme: 'Theme',
-    light: 'Light',
-    dark: 'Dark',
+    pickup: 'Pickup',
+    dropoff: 'Dropoff',
+    confirmRide: 'Confirm Taxi',
+    estimatedFare: 'Estimated',
+    findingDriver: 'Finding driver...',
+    rideBooked: 'Taxi booked successfully!',
+    driverNotified: 'Driver notified!',
+    ridePending: 'Your ride is pending. Drivers will be notified!',
+    selectLocations: 'Tap map to select locations',
+    paymentMethod: 'Payment',
+    cash: 'Cash',
+    konnect: 'Konnect',
+    edinar: 'E-Dinar',
+    card: 'Card',
   },
   fr: {
     loading: 'Chargement...',
-    error: 'Impossible de charger le statut de la course. Veuillez réessayer plus tard.',
+    error: 'Impossible de charger le statut. Veuillez réessayer.',
     history: 'Historique',
-    back: 'Retour',
-    language: 'Langue',
-    theme: 'Thème',
-    light: 'Clair',
-    dark: 'Sombre',
+    pickup: 'Départ',
+    dropoff: 'Arrivée',
+    confirmRide: 'Confirmer Taxi',
+    estimatedFare: 'Estimé',
+    findingDriver: 'Recherche de chauffeur...',
+    rideBooked: 'Taxi réservé avec succès!',
+    driverNotified: 'Chauffeur notifié!',
+    ridePending: 'Votre course est en attente.',
+    selectLocations: 'Touchez la carte pour sélectionner',
+    paymentMethod: 'Paiement',
+    cash: 'Espèces',
+    konnect: 'Konnect',
+    edinar: 'E-Dinar',
+    card: 'Carte',
   },
   ar: {
     loading: 'جار التحميل...',
-    error: 'تعذر تحميل حالة الرحلة. يرجى المحاولة مرة أخرى في وقت لاحق.',
+    error: 'تعذر تحميل الحالة. يرجى المحاولة لاحقاً.',
     history: 'السجل',
-    back: 'رجوع',
-    language: 'اللغة',
-    theme: 'المظهر',
-    light: 'فاتح',
-    dark: 'داكن',
+    pickup: 'الانطلاق',
+    dropoff: 'الوصول',
+    confirmRide: 'تأكيد التاكسي',
+    estimatedFare: 'التقدير',
+    findingDriver: 'جاري البحث عن سائق...',
+    rideBooked: 'تم حجز التاكسي بنجاح!',
+    driverNotified: 'تم إعلام السائق!',
+    ridePending: 'رحلتك قيد الانتظار.',
+    selectLocations: 'اضغط على الخريطة للتحديد',
+    paymentMethod: 'الدفع',
+    cash: 'نقدا',
+    konnect: 'كونيكت',
+    edinar: 'إي دينار',
+    card: 'بطاقة',
   }
 };
 
 export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
-  const isMobile = useIsMobile();
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [loadingRide, setLoadingRide] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+  const [menuOpen, setMenuOpen] = useState(false);
   const { user, language, setLanguage } = useAuth();
   const t = translations[language];
+
+  // Booking state
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [dropoffCoords, setDropoffCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [distance, setDistance] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [loading, setLoading] = useState(false);
+
+  const estimatedPrice = distance > 0 ? Math.round((3 + distance * 0.45) * 100) / 100 : 0;
 
   const toggleTheme = () => {
     const newIsDark = !isDark;
@@ -78,54 +114,46 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
     }
   }, []);
 
+  const getActiveRide = useCallback(async () => {
+    if (!user) return null;
+    try {
+      const { data: activeData, error: activeError } = await supabase
+        .from('rides')
+        .select('*')
+        .eq('customer_id', user.id)
+        .in('status', ['pending', 'accepted', 'driver_en_route', 'driver_arrived', 'in_progress'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeError && activeError.code !== 'PGRST116') throw activeError;
+      if (activeData) return activeData;
+      
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: completedData, error: completedError } = await supabase
+        .from('rides')
+        .select('*')
+        .eq('customer_id', user.id)
+        .eq('status', 'completed')
+        .is('driver_rating', null)
+        .gte('completed_at', fiveMinutesAgo)
+        .order('completed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (completedError && completedError.code !== 'PGRST116') throw completedError;
+      return completedData;
+    } catch (error) {
+      console.error("Error fetching active ride:", error);
+      return null;
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!user) {
       setLoadingRide(false);
       return;
     }
-
-    const getActiveRide = async () => {
-      try {
-        // First check for active rides (not completed, not cancelled)
-        const { data: activeData, error: activeError } = await supabase
-          .from('rides')
-          .select('*')
-          .eq('customer_id', user.id)
-          .in('status', ['pending', 'accepted', 'driver_en_route', 'driver_arrived', 'in_progress'])
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (activeError && activeError.code !== 'PGRST116') {
-          throw activeError;
-        }
-        
-        if (activeData) return activeData;
-        
-        // If no active ride, check for recently completed rides (last 5 minutes) that need rating
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-        const { data: completedData, error: completedError } = await supabase
-          .from('rides')
-          .select('*')
-          .eq('customer_id', user.id)
-          .eq('status', 'completed')
-          .is('driver_rating', null) // Not yet rated
-          .gte('completed_at', fiveMinutesAgo)
-          .order('completed_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (completedError && completedError.code !== 'PGRST116') {
-          throw completedError;
-        }
-        
-        return completedData;
-      } catch (error) {
-        console.error("Error fetching active ride:", error);
-        setError(t.error);
-        return null;
-      }
-    };
 
     const initialFetch = async () => {
       setLoadingRide(true);
@@ -138,25 +166,78 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
 
     const rideSubscription = supabase
       .channel(`customer-ride-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'rides',
-          filter: `customer_id=eq.${user.id}`
-        },
-        async () => {
-          const ride = await getActiveRide();
-          setActiveRide(ride as any);
-        }
-      )
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'rides',
+        filter: `customer_id=eq.${user.id}`
+      }, async () => {
+        const ride = await getActiveRide();
+        setActiveRide(ride as any);
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(rideSubscription);
     };
-  }, [user, language, t.error]);
+  }, [user, getActiveRide]);
+
+  const handleBookRide = async () => {
+    if (!user) {
+      toast.error('Please log in first');
+      return;
+    }
+    if (!pickupCoords || !dropoffCoords) {
+      toast.error('Please select pickup and dropoff locations');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const { data: rideData, error } = await supabase.from('rides').insert({
+        customer_id: user.id,
+        pickup_location: `${pickupCoords.lat.toFixed(5)}, ${pickupCoords.lng.toFixed(5)}`,
+        pickup_lat: pickupCoords.lat,
+        pickup_lng: pickupCoords.lng,
+        dropoff_location: `${dropoffCoords.lat.toFixed(5)}, ${dropoffCoords.lng.toFixed(5)}`,
+        dropoff_lat: dropoffCoords.lat,
+        dropoff_lng: dropoffCoords.lng,
+        ride_type: 'taxi',
+        payment_method: paymentMethod,
+        estimated_price: estimatedPrice,
+        distance_km: distance,
+        status: 'pending'
+      }).select().single();
+
+      if (error) {
+        toast.error(error.message || 'Failed to create ride');
+        throw error;
+      }
+
+      toast.success(t.rideBooked);
+
+      if (rideData) {
+        toast.loading(t.findingDriver);
+        const { error: assignError } = await supabase.functions.invoke('assign-ride', {
+          body: { rideId: rideData.id }
+        });
+        toast.dismiss();
+        if (assignError) {
+          toast.info(t.ridePending);
+        } else {
+          toast.success(t.driverNotified);
+        }
+      }
+      
+      setPickupCoords(null);
+      setDropoffCoords(null);
+      setDistance(0);
+    } catch (error: any) {
+      console.error('Book ride error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -164,104 +245,209 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
     setActiveRide(null);
   };
 
+  // If there's an active ride, show the ride status
+  if (activeRide) {
+    return (
+      <div className={`min-h-screen bg-background ${language === 'ar' ? 'rtl' : 'ltr'}`}>
+        <RideStatus rideId={activeRide.id} onRideComplete={handleRideComplete} />
+      </div>
+    );
+  }
+
   return (
-    <div className={`min-h-screen flex flex-col bg-gradient-to-br from-background via-background/95 to-muted/30 ${language === 'ar' ? 'rtl' : 'ltr'}`}>
-      {/* Modern Top Bar - sticky so page can scroll */}
-      <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-xl border-b border-border/50 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-6xl mx-auto">
-          <Button 
-            onClick={onBack} 
-            variant="ghost" 
-            size="sm" 
-            className="gap-2 hover:bg-primary/10 transition-all"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="font-medium">{t.back}</span>
-          </Button>
+    <div className={`fixed inset-0 bg-background ${language === 'ar' ? 'rtl' : 'ltr'}`}>
+      {/* Full Screen Map */}
+      <CustomerMapView
+        pickupLocation={pickupCoords}
+        dropoffLocation={dropoffCoords}
+        onPickupChange={setPickupCoords}
+        onDropoffChange={setDropoffCoords}
+        onDistanceCalculated={setDistance}
+      />
+
+      {/* Floating Top Controls */}
+      <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
+        {/* Menu Button */}
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="pointer-events-auto h-12 w-12 rounded-2xl bg-background/95 backdrop-blur-xl shadow-lg border-0 hover:scale-105 transition-transform"
+        >
+          {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </Button>
+
+        {/* Right Controls */}
+        <div className="flex items-center gap-2 pointer-events-auto">
+          {user && <NotificationBell userId={user.id} />}
           
-          <div className="flex items-center gap-1 sm:gap-2">
-            {/* Language Toggle */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9">
-                  <Globe className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setLanguage('en')} className={language === 'en' ? 'bg-accent' : ''}>
-                  English
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setLanguage('fr')} className={language === 'fr' ? 'bg-accent' : ''}>
-                  Français
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setLanguage('ar')} className={language === 'ar' ? 'bg-accent' : ''}>
-                  العربية
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Theme Toggle */}
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-9 w-9">
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-
-            {/* History */}
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="gap-2 hover:bg-primary/10 transition-all"
-                >
-                  <History className="h-4 w-4" />
-                  <span className="hidden sm:inline font-medium">{t.history}</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl">
-                <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2 text-xl">
-                    <History className="h-5 w-5 text-primary" />
-                    {t.history}
-                  </SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 overflow-y-auto max-h-[calc(85vh-100px)]">
-                  <RideHistory language={language} />
-                </div>
-              </SheetContent>
-            </Sheet>
-            
-            {user && <NotificationBell userId={user.id} />}
-          </div>
+          {/* Theme Toggle */}
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-12 w-12 rounded-2xl bg-background/95 backdrop-blur-xl shadow-lg border-0 hover:scale-105 transition-transform"
+          >
+            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
         </div>
       </div>
 
-      {/* Main Content Area - scrollable */}
-      <div className="flex-1 relative mt-6 overflow-auto">
-        {loadingRide ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center space-y-4">
-              <div className="relative">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/30 border-t-primary mx-auto"></div>
-                <MapPin className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-primary animate-pulse" />
+      {/* Slide-out Menu */}
+      {menuOpen && (
+        <div className="absolute top-20 left-4 z-20 bg-background/95 backdrop-blur-xl rounded-3xl shadow-2xl p-4 space-y-3 min-w-[200px] animate-fade-in">
+          {/* Language Selector */}
+          <div className="flex items-center gap-3 p-2">
+            <Globe className="h-5 w-5 text-muted-foreground" />
+            <Select value={language} onValueChange={(v) => setLanguage(v as Language)}>
+              <SelectTrigger className="flex-1 border-0 bg-muted/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="fr">Français</SelectItem>
+                <SelectItem value="ar">العربية</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* History */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" className="w-full justify-start gap-3 h-12">
+                <History className="h-5 w-5" />
+                {t.history}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-full sm:max-w-md">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-primary" />
+                  {t.history}
+                </SheetTitle>
+              </SheetHeader>
+              <div className="mt-6 overflow-y-auto max-h-[calc(100vh-100px)]">
+                <RideHistory language={language} />
               </div>
-              <p className="text-sm font-medium text-muted-foreground">{t.loading}</p>
+            </SheetContent>
+          </Sheet>
+
+          {/* Logout */}
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-3 h-12 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={onBack}
+          >
+            <X className="h-5 w-5" />
+            Logout
+          </Button>
+        </div>
+      )}
+
+      {/* Bottom Booking Panel */}
+      <div className="absolute bottom-0 left-0 right-0 z-20">
+        <div className="bg-background/95 backdrop-blur-xl rounded-t-[2rem] shadow-2xl border-t border-border/50 p-6 pb-8 space-y-4">
+          {/* Location Indicators */}
+          <div className="flex items-center gap-4">
+            {/* Pickup/Dropoff Visual */}
+            <div className="flex flex-col items-center gap-1">
+              <div className={`w-4 h-4 rounded-full ${pickupCoords ? 'bg-emerald-500' : 'bg-muted-foreground/30'} shadow-lg`} />
+              <div className="w-0.5 h-8 bg-gradient-to-b from-emerald-500 to-primary rounded-full" />
+              <div className={`w-4 h-4 rounded-full ${dropoffCoords ? 'bg-primary' : 'bg-muted-foreground/30'} shadow-lg`} />
+            </div>
+
+            {/* Location Labels */}
+            <div className="flex-1 space-y-3">
+              <div 
+                className={`p-3 rounded-2xl transition-all cursor-pointer ${
+                  pickupCoords 
+                    ? 'bg-emerald-500/10 border border-emerald-500/30' 
+                    : 'bg-muted/50 border border-dashed border-muted-foreground/30'
+                }`}
+              >
+                <span className={`text-sm font-medium ${pickupCoords ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                  {t.pickup}
+                </span>
+                {pickupCoords && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {pickupCoords.lat.toFixed(4)}, {pickupCoords.lng.toFixed(4)}
+                  </p>
+                )}
+              </div>
+
+              <div 
+                className={`p-3 rounded-2xl transition-all cursor-pointer ${
+                  dropoffCoords 
+                    ? 'bg-primary/10 border border-primary/30' 
+                    : 'bg-muted/50 border border-dashed border-muted-foreground/30'
+                }`}
+              >
+                <span className={`text-sm font-medium ${dropoffCoords ? 'text-primary' : 'text-muted-foreground'}`}>
+                  {t.dropoff}
+                </span>
+                {dropoffCoords && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {dropoffCoords.lat.toFixed(4)}, {dropoffCoords.lng.toFixed(4)}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-        ) : error ? (
-          <div className="absolute inset-0 flex items-center justify-center p-6">
-            <div className="text-center p-8 bg-destructive/10 rounded-2xl border border-destructive/20 max-w-md">
-              <div className="text-destructive font-semibold text-lg mb-2">⚠️ Error</div>
-              <div className="text-destructive/80">{error}</div>
+
+          {/* Payment & Price Row */}
+          <div className="flex items-center justify-between gap-4">
+            {/* Payment Method */}
+            <div className="flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="w-28 h-10 border-0 bg-muted/50 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">{t.cash}</SelectItem>
+                  <SelectItem value="konnect">{t.konnect}</SelectItem>
+                  <SelectItem value="edinar">{t.edinar}</SelectItem>
+                  <SelectItem value="card">{t.card}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Estimated Fare */}
+            {estimatedPrice > 0 && (
+              <div className="text-right">
+                <span className="text-xs text-muted-foreground">{t.estimatedFare}</span>
+                <p className="text-2xl font-bold text-primary">{estimatedPrice} TND</p>
+              </div>
+            )}
           </div>
-        ) : activeRide ? (
-          <RideStatus rideId={activeRide.id} onRideComplete={handleRideComplete} />
-        ) : (
-          <div className="max-w-6xl mx-auto px-4 pb-8">
-            <BookRide language={language} isMobileFullScreen={isMobile} />
-          </div>
-        )}
+
+          {/* Book Button */}
+          <Button
+            onClick={handleBookRide}
+            disabled={loading || !pickupCoords || !dropoffCoords}
+            className="w-full h-14 rounded-2xl text-lg font-semibold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
+          >
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                {t.findingDriver}
+              </div>
+            ) : (
+              t.confirmRide
+            )}
+          </Button>
+        </div>
       </div>
+
+      {/* Loading Overlay */}
+      {loadingRide && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+            <p className="text-sm font-medium text-muted-foreground">{t.loading}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
