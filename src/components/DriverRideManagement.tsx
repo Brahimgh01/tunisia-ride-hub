@@ -178,8 +178,7 @@ const DriverRideManagement = ({ language, isOnline }: DriverRideManagementProps)
       })
       .eq('id', rideId)
       .eq('status', 'pending')
-      .or(`driver_id.is.null,driver_id.eq.${user.id}`)
-      .select('id');
+      .select('id, status, driver_id');
 
     if (error) {
       console.error('Failed to accept ride:', error);
