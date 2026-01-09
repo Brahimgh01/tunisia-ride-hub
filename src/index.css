@@ -162,16 +162,68 @@ All colors MUST be HSL for proper theming.
   }
 }
 
-/* Map marker pulse animation for Map component */
+/* Modern Map Marker Animations */
 @keyframes marker-pulse {
   0%, 100% {
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
     opacity: 0.7;
   }
   50% {
-    transform: translate(-50%, -50%) scale(2.2);
+    transform: scale(1.8);
     opacity: 0;
   }
+}
+
+@keyframes marker-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes marker-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 40px currentColor;
+  }
+}
+
+.modern-marker {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.modern-marker:hover {
+  transform: scale(1.1);
+}
+
+.modern-marker .animate-ping {
+  animation: marker-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.modern-marker .animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Route line animation */
+@keyframes route-dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* Legacy marker wrapper support */
+.map-marker-wrapper { 
+  position: relative; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center;
 }
 
 .marker-pulse {
@@ -185,12 +237,6 @@ All colors MUST be HSL for proper theming.
   animation: marker-pulse 2.5s ease-out infinite;
   pointer-events: none;
   z-index: 0;
-}
-
-.map-marker-wrapper { 
-  position: relative; 
-  display: flex; 
-  flex-direction: column; 
-  align-items: center;
+  transform: translate(-50%, -50%);
 }
 
