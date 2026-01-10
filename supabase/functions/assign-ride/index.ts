@@ -63,9 +63,9 @@ serve(async (req) => {
 
     if (!driverLocations || driverLocations.length === 0) {
       console.warn('No available driver locations found.');
-      return new Response(JSON.stringify({ message: 'No available drivers found. Ride remains pending.' }), {
+      return new Response(JSON.stringify({ message: 'No available drivers found. Ride remains pending.', assigned: false }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 404
+        status: 200
       });
     }
 
@@ -90,9 +90,9 @@ serve(async (req) => {
     if (!drivers || drivers.length === 0) {
       // No drivers available, keep the ride as pending
       console.warn('No available drivers found.');
-      return new Response(JSON.stringify({ message: 'No available drivers found. Ride remains pending.' }), {
+      return new Response(JSON.stringify({ message: 'No available drivers found. Ride remains pending.', assigned: false }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 404
+        status: 200
       });
     }
 
@@ -120,9 +120,9 @@ serve(async (req) => {
 
     if (!closestDriver) {
       console.warn('No available drivers with valid locations found.');
-      return new Response(JSON.stringify({ message: 'No available drivers with valid locations found. Ride remains pending.' }), {
+      return new Response(JSON.stringify({ message: 'No available drivers with valid locations found. Ride remains pending.', assigned: false }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 404
+        status: 200
       });
     }
 
@@ -148,7 +148,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       message: 'Ride assigned successfully', 
       driverId: closestDriver.driver_id, 
-      distance: minDistance 
+      distance: minDistance,
+      assigned: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
