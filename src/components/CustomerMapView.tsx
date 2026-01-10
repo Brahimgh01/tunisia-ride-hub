@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from '@/integrations/supabase/client';
-import { Navigation, MapPin, CircleDot } from 'lucide-react';
+import { Navigation, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useDriverLocations, DriverLocation } from '@/hooks/useDriverLocations';
@@ -101,10 +101,10 @@ const CustomerMapView = ({
 
       map.current.on('click', (e) => {
         const selecting = selectingLocationRef.current;
-        const location = { lat: e.lngLat.lat, lng: e.lngLat.lng };
         
+        // ONLY set location when a button has been pressed (manual selection mode)
         if (selecting) {
-          // Manual selection mode - always set the chosen type
+          const location = { lat: e.lngLat.lat, lng: e.lngLat.lng };
           if (selecting === 'pickup') {
             onPickupChange?.(location);
             toast({ title: "✓ Pickup set" });
@@ -115,21 +115,8 @@ const CustomerMapView = ({
           selectingLocationRef.current = null;
           setSelectingLocation(null);
           map.current!.getCanvas().style.cursor = '';
-        } else {
-          // Auto-select mode: cycle through pickup -> dropoff -> pickup...
-          if (!pickupRef.current) {
-            onPickupChange?.(location);
-            toast({ title: "✓ Pickup set", description: "Now tap your destination" });
-          } else if (!dropoffRef.current) {
-            onDropoffChange?.(location);
-            toast({ title: "✓ Dropoff set" });
-          } else {
-            // Both are set - update pickup and clear dropoff for new route
-            onPickupChange?.(location);
-            onDropoffChange?.(undefined as any);
-            toast({ title: "✓ New pickup set", description: "Now tap your destination" });
-          }
         }
+        // No auto-selection - user must press a button first
       });
 
       getCurrentLocation();
@@ -363,19 +350,14 @@ const CustomerMapView = ({
   const useCurrentAsPickup = () => {
     if (currentLocation) {
       onPickupChange?.(currentLocation);
-      // Clear dropoff if changing pickup to allow new route
-      if (dropoffLocation) {
-        onDropoffChange?.(undefined as any);
+      toast({ title: "✓ Using current location as pickup", description: "Now tap dropoff button to set destination" });
+      // Center map on current location
+      if (map.current) {
+        map.current.flyTo({ center: [currentLocation.lng, currentLocation.lat], zoom: 15, duration: 1000 });
       }
-      toast({ title: "✓ Using current location as pickup", description: "Now tap your destination" });
-    }
-  };
-
-  const centerOnCurrentLocation = () => {
-    if (currentLocation && map.current) {
-      map.current.flyTo({ center: [currentLocation.lng, currentLocation.lat], zoom: 15, duration: 1000 });
     } else {
       getCurrentLocation();
+      toast({ title: "Getting your location...", description: "Please wait" });
     }
   };
 
@@ -394,24 +376,14 @@ const CustomerMapView = ({
       
       {/* Floating Action Buttons */}
       <div className="absolute bottom-48 right-4 z-10 flex flex-col gap-2">
-        {/* Center on Current Location */}
-        <Button
-          size="icon"
-          onClick={centerOnCurrentLocation}
-          className="h-12 w-12 rounded-2xl bg-background/95 backdrop-blur-xl shadow-lg border-0 hover:scale-105 transition-transform text-blue-500 hover:bg-background"
-          title="Center map on my location"
-        >
-          <Navigation className="h-5 w-5" />
-        </Button>
-
-        {/* Use Current Location as Pickup */}
+        {/* Current Location - single button that sets pickup to current location */}
         <Button
           size="icon"
           onClick={useCurrentAsPickup}
-          className="h-12 w-12 rounded-2xl bg-background/95 backdrop-blur-xl shadow-lg border-0 hover:scale-105 transition-transform text-emerald-500 hover:bg-background"
-          title="Use my location as pickup"
+          className="h-12 w-12 rounded-2xl bg-background/95 backdrop-blur-xl shadow-lg border-0 hover:scale-105 transition-transform text-blue-500 hover:bg-background"
+          title="Use my current location as pickup"
         >
-          <CircleDot className="h-5 w-5" />
+          <Navigation className="h-5 w-5" />
         </Button>
 
         {/* Select Pickup on Map */}

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Ride, Language } from '@/lib/types';
-import Map, { MapLocation } from './Map';
+import RideStatusMap from './RideStatusMap';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -155,7 +155,7 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
   const { user, language } = useAuth();
   const t = translations[language];
   const [ride, setRide] = useState<Ride | null>(null);
-  const [driverLocation, setDriverLocation] = useState<MapLocation | null>(null);
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
@@ -463,8 +463,8 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
   if (!ride) return <div className="p-4 text-center text-muted-foreground">{t.rideNotFound}</div>;
 
   const canCancel = ['pending', 'accepted', 'driver_en_route', 'driver_arrived'].includes(ride.status);
-  const pickupLocation: MapLocation = { lat: ride.pickup_lat, lng: ride.pickup_lng };
-  const dropoffLocation: MapLocation = { lat: ride.dropoff_lat, lng: ride.dropoff_lng };
+  const pickupLocation = { lat: ride.pickup_lat, lng: ride.pickup_lng };
+  const dropoffLocation = { lat: ride.dropoff_lat, lng: ride.dropoff_lng };
 
   return (
     <div className={`space-y-4 p-4 ${language === 'ar' ? 'rtl' : 'ltr'}`}>
@@ -518,15 +518,14 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Map with driver tracking */}
-          <Map
-            pickupLocation={pickupLocation}
-            dropoffLocation={dropoffLocation}
-            driverLocation={driverLocation}
-            height="h-64 sm:h-80"
-            showCurrentLocation={false}
-            interactive={false}
-          />
+          {/* Map with driver tracking - modern style matching CustomerMapView */}
+          <div className="rounded-2xl overflow-hidden border border-border/50 shadow-lg">
+            <RideStatusMap
+              pickupLocation={pickupLocation}
+              dropoffLocation={dropoffLocation}
+              driverLocation={driverLocation}
+            />
+          </div>
           
           {/* Waiting message when no driver yet */}
           {ride.status === 'pending' && !ride.driver && (
