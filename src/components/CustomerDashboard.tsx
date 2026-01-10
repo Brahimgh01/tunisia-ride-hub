@@ -218,14 +218,17 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
 
       if (rideData) {
         toast.loading(t.findingDriver);
-        const { error: assignError } = await supabase.functions.invoke('assign-ride', {
+        const { data: assignData, error: assignError } = await supabase.functions.invoke('assign-ride', {
           body: { rideId: rideData.id }
         });
         toast.dismiss();
+        
         if (assignError) {
           toast.info(t.ridePending);
-        } else {
+        } else if (assignData?.assigned) {
           toast.success(t.driverNotified);
+        } else {
+          toast.info(t.ridePending);
         }
       }
       
