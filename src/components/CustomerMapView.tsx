@@ -53,6 +53,10 @@ const CustomerMapView = ({
 
   useEffect(() => {
     if (map.current) {
+      // Update the refs so click handler has latest state
+      if ((map.current as any).__updateRefs) {
+        (map.current as any).__updateRefs(pickupLocation, dropoffLocation);
+      }
       updateMapMarkers();
       if (pickupLocation && dropoffLocation) {
         calculateRoute();
@@ -85,6 +89,16 @@ const CustomerMapView = ({
       map.current.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
 
       // Click handler for selecting locations
+      // Use refs to track the latest pickup/dropoff state
+      const pickupRef = { current: pickupLocation };
+      const dropoffRef = { current: dropoffLocation };
+      
+      // Store update functions that will be called to sync refs
+      (map.current as any).__updateRefs = (pickup: MapLocation | null, dropoff: MapLocation | null) => {
+        pickupRef.current = pickup;
+        dropoffRef.current = dropoff;
+      };
+
       map.current.on('click', (e) => {
         const selecting = selectingLocationRef.current;
         if (selecting) {
@@ -101,10 +115,10 @@ const CustomerMapView = ({
           map.current!.getCanvas().style.cursor = '';
         } else {
           // Auto-select: first click = pickup, second = dropoff
-          if (!pickupLocation) {
+          if (!pickupRef.current) {
             onPickupChange?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
             toast({ title: "✓ Pickup set", description: "Now tap your destination" });
-          } else if (!dropoffLocation) {
+          } else if (!dropoffRef.current) {
             onDropoffChange?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
             toast({ title: "✓ Dropoff set" });
           }
