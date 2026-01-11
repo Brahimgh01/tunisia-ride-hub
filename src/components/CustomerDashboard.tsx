@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from './NotificationBell';
 import RideStatus from './RideStatus';
-import { History, Sun, Moon, Globe, Navigation, Wallet, Menu, X } from 'lucide-react';
+import { History, Sun, Moon, Globe, Navigation, Wallet, Menu, X, MapPin, MapPinned } from 'lucide-react';
 import { useAuth, Language } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Ride } from '@/lib/types';
@@ -96,6 +96,8 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
   const [distance, setDistance] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [loading, setLoading] = useState(false);
+  const [selectingLocation, setSelectingLocation] = useState<'pickup' | 'dropoff' | null>(null);
+  const mapRef = useRef<{ startSelectingLocation: (type: 'pickup' | 'dropoff') => void; useCurrentAsPickup: () => void } | null>(null);
 
   const estimatedPrice = distance > 0 ? Math.round((3 + distance * 0.45) * 100) / 100 : 0;
 
@@ -261,11 +263,20 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
     <div className={`fixed inset-0 bg-background ${language === 'ar' ? 'rtl' : 'ltr'}`}>
       {/* Full Screen Map */}
       <CustomerMapView
+        ref={mapRef}
         pickupLocation={pickupCoords}
         dropoffLocation={dropoffCoords}
-        onPickupChange={setPickupCoords}
-        onDropoffChange={setDropoffCoords}
+        onPickupChange={(loc) => {
+          setPickupCoords(loc);
+          setSelectingLocation(null);
+        }}
+        onDropoffChange={(loc) => {
+          setDropoffCoords(loc);
+          setSelectingLocation(null);
+        }}
         onDistanceCalculated={setDistance}
+        selectingLocation={selectingLocation}
+        onSelectionModeChange={setSelectingLocation}
       />
 
       {/* Floating Top Controls */}
@@ -361,35 +372,72 @@ export function CustomerDashboard({ onBack }: CustomerDashboardProps) {
 
             {/* Location Labels */}
             <div className="flex-1 space-y-3">
+              {/* Pickup Rectangle */}
               <div 
-                className={`p-3 rounded-2xl transition-all cursor-pointer ${
-                  pickupCoords 
-                    ? 'bg-emerald-500/10 border border-emerald-500/30' 
-                    : 'bg-muted/50 border border-dashed border-muted-foreground/30'
+                onClick={() => {
+                  setSelectingLocation('pickup');
+                  mapRef.current?.startSelectingLocation('pickup');
+                }}
+                className={`p-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98] ${
+                  selectingLocation === 'pickup'
+                    ? 'bg-emerald-500/20 border-2 border-emerald-500 ring-2 ring-emerald-500/30'
+                    : pickupCoords 
+                      ? 'bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20' 
+                      : 'bg-muted/50 border border-dashed border-muted-foreground/30 hover:border-emerald-500/50'
                 }`}
               >
-                <span className={`text-sm font-medium ${pickupCoords ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                  {t.pickup}
-                </span>
-                {pickupCoords && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPin className={`h-4 w-4 ${selectingLocation === 'pickup' || pickupCoords ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+                    <span className={`text-sm font-medium ${selectingLocation === 'pickup' || pickupCoords ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                      {selectingLocation === 'pickup' ? 'Tap on map...' : t.pickup}
+                    </span>
+                  </div>
+                  {/* Current Location Button */}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      mapRef.current?.useCurrentAsPickup();
+                      setSelectingLocation(null);
+                    }}
+                    className="h-8 px-2 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
+                  >
+                    <Navigation className="h-4 w-4 mr-1" />
+                    GPS
+                  </Button>
+                </div>
+                {pickupCoords && !selectingLocation && (
+                  <p className="text-xs text-muted-foreground mt-1 ml-6">
                     {pickupCoords.lat.toFixed(4)}, {pickupCoords.lng.toFixed(4)}
                   </p>
                 )}
               </div>
 
+              {/* Dropoff Rectangle */}
               <div 
-                className={`p-3 rounded-2xl transition-all cursor-pointer ${
-                  dropoffCoords 
-                    ? 'bg-primary/10 border border-primary/30' 
-                    : 'bg-muted/50 border border-dashed border-muted-foreground/30'
+                onClick={() => {
+                  setSelectingLocation('dropoff');
+                  mapRef.current?.startSelectingLocation('dropoff');
+                }}
+                className={`p-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98] ${
+                  selectingLocation === 'dropoff'
+                    ? 'bg-red-500/20 border-2 border-red-500 ring-2 ring-red-500/30'
+                    : dropoffCoords 
+                      ? 'bg-primary/10 border border-primary/30 hover:bg-primary/20' 
+                      : 'bg-muted/50 border border-dashed border-muted-foreground/30 hover:border-primary/50'
                 }`}
               >
-                <span className={`text-sm font-medium ${dropoffCoords ? 'text-primary' : 'text-muted-foreground'}`}>
-                  {t.dropoff}
-                </span>
-                {dropoffCoords && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-2">
+                  <MapPinned className={`h-4 w-4 ${selectingLocation === 'dropoff' || dropoffCoords ? 'text-red-500' : 'text-muted-foreground'}`} />
+                  <span className={`text-sm font-medium ${selectingLocation === 'dropoff' || dropoffCoords ? 'text-red-500' : 'text-muted-foreground'}`}>
+                    {selectingLocation === 'dropoff' ? 'Tap on map...' : t.dropoff}
+                  </span>
+                </div>
+                {dropoffCoords && !selectingLocation && (
+                  <p className="text-xs text-muted-foreground mt-1 ml-6">
                     {dropoffCoords.lat.toFixed(4)}, {dropoffCoords.lng.toFixed(4)}
                   </p>
                 )}
