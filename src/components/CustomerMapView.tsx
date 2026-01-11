@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from '@/integrations/supabase/client';
-import { Navigation, MapPin, MapPinned } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { MapPin, MapPinned } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useDriverLocations, DriverLocation } from '@/hooks/useDriverLocations';
+import { useDriverLocations } from '@/hooks/useDriverLocations';
 
 interface MapLocation {
   lat: number;
@@ -18,15 +17,24 @@ interface CustomerMapViewProps {
   onPickupChange?: (location: MapLocation) => void;
   onDropoffChange?: (location: MapLocation) => void;
   onDistanceCalculated?: (distance: number) => void;
+  selectingLocation?: 'pickup' | 'dropoff' | null;
+  onSelectionModeChange?: (mode: 'pickup' | 'dropoff' | null) => void;
 }
 
-const CustomerMapView = ({
+export interface CustomerMapViewHandle {
+  startSelectingLocation: (type: 'pickup' | 'dropoff') => void;
+  useCurrentAsPickup: () => void;
+}
+
+const CustomerMapView = forwardRef<CustomerMapViewHandle, CustomerMapViewProps>(({
   pickupLocation = null,
   dropoffLocation = null,
   onPickupChange,
   onDropoffChange,
   onDistanceCalculated,
-}: CustomerMapViewProps) => {
+  selectingLocation: externalSelectingLocation,
+  onSelectionModeChange,
+}, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const pickupMarker = useRef<mapboxgl.Marker | null>(null);
@@ -35,13 +43,57 @@ const CustomerMapView = ({
   const currentLocationMarker = useRef<mapboxgl.Marker | null>(null);
   const [currentLocation, setCurrentLocation] = useState<MapLocation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectingLocation, setSelectingLocation] = useState<'pickup' | 'dropoff' | null>(null);
+  const [internalSelectingLocation, setInternalSelectingLocation] = useState<'pickup' | 'dropoff' | null>(null);
+  
+  // Use external state if provided, otherwise use internal
+  const selectingLocation = externalSelectingLocation !== undefined ? externalSelectingLocation : internalSelectingLocation;
+  const setSelectingLocation = (mode: 'pickup' | 'dropoff' | null) => {
+    if (onSelectionModeChange) {
+      onSelectionModeChange(mode);
+    } else {
+      setInternalSelectingLocation(mode);
+    }
+  };
+  
   const selectingLocationRef = useRef<'pickup' | 'dropoff' | null>(null);
   const routeAnimRef = useRef<number | null>(null);
   const { toast } = useToast();
   const { driverLocations } = useDriverLocations();
 
   const defaultCenter: MapLocation = { lat: 36.8065, lng: 10.1815 };
+
+  // Sync selectingLocationRef with state
+  useEffect(() => {
+    selectingLocationRef.current = selectingLocation;
+    if (map.current) {
+      map.current.getCanvas().style.cursor = selectingLocation ? 'crosshair' : '';
+    }
+  }, [selectingLocation]);
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    startSelectingLocation: (type: 'pickup' | 'dropoff') => {
+      selectingLocationRef.current = type;
+      setSelectingLocation(type);
+      if (map.current) {
+        map.current.getCanvas().style.cursor = 'crosshair';
+      }
+      toast({ title: `Tap on map to set ${type}` });
+    },
+    useCurrentAsPickup: () => {
+      if (currentLocation) {
+        onPickupChange?.(currentLocation);
+        setSelectingLocation(null);
+        toast({ title: "✓ Using current location as pickup" });
+        if (map.current) {
+          map.current.flyTo({ center: [currentLocation.lng, currentLocation.lat], zoom: 15, duration: 1000 });
+        }
+      } else {
+        getCurrentLocation();
+        toast({ title: "Getting your location..." });
+      }
+    }
+  }), [currentLocation, onPickupChange, toast]);
 
   useEffect(() => {
     initializeMap();
@@ -374,101 +426,21 @@ const CustomerMapView = ({
       
       <div ref={mapContainer} className="w-full h-full" />
       
-      {/* Floating Action Buttons - Combined */}
-      <div className="absolute bottom-48 right-4 z-50 flex flex-col gap-3">
-        {/* Pickup Button */}
-        <div className="relative">
-          <Button
-            type="button"
-            size="icon"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (selectingLocation === 'pickup') {
-                // Already in pickup mode - use current location
-                useCurrentAsPickup();
-                setSelectingLocation(null);
-                selectingLocationRef.current = null;
-                if (map.current) map.current.getCanvas().style.cursor = '';
-              } else {
-                // Enter pickup selection mode
-                startSelectingLocation('pickup');
-              }
-            }}
-            className={`h-14 w-14 rounded-2xl shadow-lg border-0 hover:scale-105 transition-all duration-200 ${
-              selectingLocation === 'pickup' 
-                ? 'bg-emerald-500 text-white ring-4 ring-emerald-500/50 scale-110' 
-                : pickupLocation 
-                  ? 'bg-emerald-500/20 backdrop-blur-xl text-emerald-500 hover:bg-emerald-500/30' 
-                  : 'bg-background/95 backdrop-blur-xl text-emerald-500 hover:bg-background'
-            }`}
-          >
-            <div className="flex flex-col items-center">
-              <MapPin className="h-5 w-5" />
-              {selectingLocation === 'pickup' && <Navigation className="h-3 w-3 mt-0.5" />}
-            </div>
-          </Button>
-          {/* Label */}
-          <span className={`absolute -left-16 top-1/2 -translate-y-1/2 text-xs font-medium whitespace-nowrap px-2 py-1 rounded-lg ${
-            selectingLocation === 'pickup' 
-              ? 'bg-emerald-500 text-white' 
-              : 'bg-background/90 text-emerald-500'
-          }`}>
-            {selectingLocation === 'pickup' ? 'Tap map / GPS' : 'Pickup'}
-          </span>
-        </div>
-
-        {/* Dropoff Button */}
-        <div className="relative">
-          <Button
-            type="button"
-            size="icon"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (selectingLocation === 'dropoff') {
-                // Cancel dropoff selection
-                setSelectingLocation(null);
-                selectingLocationRef.current = null;
-                if (map.current) map.current.getCanvas().style.cursor = '';
-              } else {
-                startSelectingLocation('dropoff');
-              }
-            }}
-            className={`h-14 w-14 rounded-2xl shadow-lg border-0 hover:scale-105 transition-all duration-200 ${
-              selectingLocation === 'dropoff' 
-                ? 'bg-red-500 text-white ring-4 ring-red-500/50 scale-110' 
-                : dropoffLocation 
-                  ? 'bg-red-500/20 backdrop-blur-xl text-red-500 hover:bg-red-500/30' 
-                  : 'bg-background/95 backdrop-blur-xl text-red-500 hover:bg-background'
-            }`}
-          >
-            <MapPinned className="h-5 w-5" />
-          </Button>
-          {/* Label */}
-          <span className={`absolute -left-16 top-1/2 -translate-y-1/2 text-xs font-medium whitespace-nowrap px-2 py-1 rounded-lg ${
-            selectingLocation === 'dropoff' 
-              ? 'bg-red-500 text-white' 
-              : 'bg-background/90 text-red-500'
-          }`}>
-            {selectingLocation === 'dropoff' ? 'Tap map' : 'Dropoff'}
-          </span>
-        </div>
-      </div>
-
-      {/* Selection Mode Indicator - More Prominent */}
+      {/* Selection Mode Indicator */}
       {selectingLocation && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50">
           <div className={`px-6 py-3 rounded-2xl text-white text-base font-bold shadow-2xl animate-bounce flex items-center gap-2 ${
             selectingLocation === 'pickup' ? 'bg-emerald-500' : 'bg-red-500'
           }`}>
             {selectingLocation === 'pickup' ? <MapPin className="h-5 w-5" /> : <MapPinned className="h-5 w-5" />}
-            {selectingLocation === 'pickup' ? 'Tap map or button again for GPS' : 'Tap on map to set DROPOFF'}
+            Tap on map to set {selectingLocation.toUpperCase()}
           </div>
         </div>
       )}
     </div>
   );
-};
+});
+
+CustomerMapView.displayName = 'CustomerMapView';
 
 export default CustomerMapView;
