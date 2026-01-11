@@ -375,11 +375,16 @@ const CustomerMapView = ({
       <div ref={mapContainer} className="w-full h-full" />
       
       {/* Floating Action Buttons */}
-      <div className="absolute bottom-48 right-4 z-10 flex flex-col gap-2">
+      <div className="absolute bottom-48 right-4 z-50 flex flex-col gap-2">
         {/* Current Location - single button that sets pickup to current location */}
         <Button
+          type="button"
           size="icon"
-          onClick={useCurrentAsPickup}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            useCurrentAsPickup();
+          }}
           className="h-12 w-12 rounded-2xl bg-background/95 backdrop-blur-xl shadow-lg border-0 hover:scale-105 transition-transform text-blue-500 hover:bg-background"
           title="Use my current location as pickup"
         >
@@ -388,11 +393,16 @@ const CustomerMapView = ({
 
         {/* Select Pickup on Map */}
         <Button
+          type="button"
           size="icon"
-          onClick={() => startSelectingLocation('pickup')}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startSelectingLocation('pickup');
+          }}
           className={`h-12 w-12 rounded-2xl shadow-lg border-0 hover:scale-105 transition-transform ${
             selectingLocation === 'pickup' 
-              ? 'bg-emerald-500 text-white' 
+              ? 'bg-emerald-500 text-white ring-4 ring-emerald-500/50 animate-pulse' 
               : pickupLocation ? 'bg-emerald-500/20 backdrop-blur-xl text-emerald-500 hover:bg-emerald-500/30' : 'bg-background/95 backdrop-blur-xl text-emerald-500 hover:bg-background'
           }`}
           title="Tap map to set pickup"
@@ -402,6 +412,7 @@ const CustomerMapView = ({
 
         {/* Select Dropoff on Map */}
         <Button
+          type="button"
           size="icon"
           onClick={(e) => {
             e.preventDefault();
@@ -410,7 +421,7 @@ const CustomerMapView = ({
           }}
           className={`h-12 w-12 rounded-2xl shadow-lg border-0 hover:scale-105 transition-transform ${
             selectingLocation === 'dropoff' 
-              ? 'bg-red-500 text-white' 
+              ? 'bg-red-500 text-white ring-4 ring-red-500/50 animate-pulse' 
               : dropoffLocation ? 'bg-red-500/20 backdrop-blur-xl text-red-500 hover:bg-red-500/30' : 'bg-background/95 backdrop-blur-xl text-red-500 hover:bg-background'
           }`}
           title="Tap map to set dropoff"
@@ -419,13 +430,14 @@ const CustomerMapView = ({
         </Button>
       </div>
 
-      {/* Selection Mode Indicator */}
+      {/* Selection Mode Indicator - More Prominent */}
       {selectingLocation && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10">
-          <div className={`px-4 py-2 rounded-full text-white text-sm font-medium shadow-lg animate-pulse ${
-            selectingLocation === 'pickup' ? 'bg-emerald-500' : 'bg-primary'
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50">
+          <div className={`px-6 py-3 rounded-2xl text-white text-base font-bold shadow-2xl animate-bounce flex items-center gap-2 ${
+            selectingLocation === 'pickup' ? 'bg-emerald-500' : 'bg-red-500'
           }`}>
-            Tap to set {selectingLocation}
+            {selectingLocation === 'pickup' ? <MapPin className="h-5 w-5" /> : <MapPinned className="h-5 w-5" />}
+            Tap on map to set {selectingLocation.toUpperCase()}
           </div>
         </div>
       )}
