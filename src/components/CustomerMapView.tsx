@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from '@/integrations/supabase/client';
-import { Navigation, MapPin } from 'lucide-react';
+import { Navigation, MapPin, MapPinned } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useDriverLocations, DriverLocation } from '@/hooks/useDriverLocations';
@@ -403,15 +403,19 @@ const CustomerMapView = ({
         {/* Select Dropoff on Map */}
         <Button
           size="icon"
-          onClick={() => startSelectingLocation('dropoff')}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startSelectingLocation('dropoff');
+          }}
           className={`h-12 w-12 rounded-2xl shadow-lg border-0 hover:scale-105 transition-transform ${
             selectingLocation === 'dropoff' 
-              ? 'bg-primary text-white' 
-              : dropoffLocation ? 'bg-primary/20 backdrop-blur-xl text-primary hover:bg-primary/30' : 'bg-background/95 backdrop-blur-xl text-primary hover:bg-background'
+              ? 'bg-red-500 text-white' 
+              : dropoffLocation ? 'bg-red-500/20 backdrop-blur-xl text-red-500 hover:bg-red-500/30' : 'bg-background/95 backdrop-blur-xl text-red-500 hover:bg-background'
           }`}
           title="Tap map to set dropoff"
         >
-          <MapPin className="h-5 w-5" />
+          <MapPinned className="h-5 w-5" />
         </Button>
       </div>
 
