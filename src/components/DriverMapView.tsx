@@ -45,6 +45,9 @@ const translations = {
     locationError: 'Could not get your location',
     acceptSuccess: 'Ride accepted! Customer has been notified.',
     acceptError: 'Failed to accept ride',
+    activeRide: 'Active Ride',
+    navigateToPickup: 'Navigate to Pickup',
+    navigateToDropoff: 'Navigate to Dropoff',
   },
   fr: {
     youAreOffline: 'Vous êtes hors ligne',
@@ -62,6 +65,9 @@ const translations = {
     locationError: 'Impossible d\'obtenir votre position',
     acceptSuccess: 'Course acceptée ! Le client a été notifié.',
     acceptError: 'Échec de l\'acceptation',
+    activeRide: 'Course Active',
+    navigateToPickup: 'Naviguer vers prise en charge',
+    navigateToDropoff: 'Naviguer vers dépose',
   },
   ar: {
     youAreOffline: 'أنت غير متصل',
@@ -79,6 +85,9 @@ const translations = {
     locationError: 'تعذر الحصول على موقعك',
     acceptSuccess: 'تم قبول الرحلة! تم إخطار العميل.',
     acceptError: 'فشل قبول الرحلة',
+    activeRide: 'رحلة نشطة',
+    navigateToPickup: 'انتقل إلى نقطة الانطلاق',
+    navigateToDropoff: 'انتقل إلى نقطة الوصول',
   }
 };
 
@@ -90,10 +99,12 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   const map = useRef<mapboxgl.Map | null>(null);
   const driverMarker = useRef<mapboxgl.Marker | null>(null);
   const rideMarkers = useRef<mapboxgl.Marker[]>([]);
+  const activeRideMarkers = useRef<{ pickup?: mapboxgl.Marker; dropoff?: mapboxgl.Marker }>({});
   
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [pendingRides, setPendingRides] = useState<PendingRide[]>([]);
   const [selectedRide, setSelectedRide] = useState<PendingRide | null>(null);
+  const [activeRide, setActiveRide] = useState<PendingRide | null>(null);
   const [loading, setLoading] = useState(true);
 
   const defaultCenter = { lat: 36.8065, lng: 10.1815 }; // Tunis
@@ -104,6 +115,51 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       map.current?.remove();
     };
   }, []);
+
+  // Fetch active ride on mount and subscribe to updates
+  useEffect(() => {
+    if (!isOnline || !driverId) return;
+
+    const fetchActiveRide = async () => {
+      const { data } = await supabase
+        .from('rides')
+        .select('*')
+        .eq('driver_id', driverId)
+        .in('status', ['accepted', 'driver_en_route', 'driver_arrived', 'in_progress'])
+        .order('accepted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        setActiveRide(data as unknown as PendingRide);
+      }
+    };
+
+    fetchActiveRide();
+
+    // Subscribe to driver's ride updates
+    const channel = supabase
+      .channel('driver-active-ride')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'rides', filter: `driver_id=eq.${driverId}` },
+        (payload) => {
+          const ride = payload.new as any;
+          if (['accepted', 'driver_en_route', 'driver_arrived', 'in_progress'].includes(ride.status)) {
+            setActiveRide(ride as PendingRide);
+          } else {
+            // Ride completed or cancelled
+            setActiveRide(null);
+            clearActiveRideMarkers();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isOnline, driverId]);
 
   useEffect(() => {
     if (isOnline && map.current) {
@@ -166,6 +222,13 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       updateRideMarkers();
     }
   }, [pendingRides]);
+
+  // Update active ride route and markers when active ride changes
+  useEffect(() => {
+    if (map.current && activeRide) {
+      showActiveRideRoute();
+    }
+  }, [activeRide, currentLocation]);
 
   const initializeMap = async () => {
     try {
@@ -382,6 +445,165 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
     });
   };
 
+  const clearActiveRideMarkers = () => {
+    if (activeRideMarkers.current.pickup) {
+      activeRideMarkers.current.pickup.remove();
+      activeRideMarkers.current.pickup = undefined;
+    }
+    if (activeRideMarkers.current.dropoff) {
+      activeRideMarkers.current.dropoff.remove();
+      activeRideMarkers.current.dropoff = undefined;
+    }
+    // Remove route layer if exists
+    if (map.current?.getSource('active-route')) {
+      map.current.removeLayer('active-route-glow');
+      map.current.removeLayer('active-route-line');
+      map.current.removeSource('active-route');
+    }
+  };
+
+  const createActiveRideMarker = (type: 'pickup' | 'dropoff') => {
+    const el = document.createElement('div');
+    el.className = 'active-ride-marker';
+    
+    if (type === 'pickup') {
+      el.innerHTML = `
+        <div class="relative">
+          <div class="absolute -inset-3 rounded-full bg-emerald-500/20 animate-ping"></div>
+          <div class="absolute -inset-2 rounded-full bg-emerald-500/30 animate-pulse"></div>
+          <div class="relative w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/50 flex items-center justify-center border-2 border-white">
+            <div class="w-3 h-3 rounded-full bg-white"></div>
+          </div>
+          <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            ${t.pickup}
+          </div>
+        </div>
+      `;
+    } else {
+      el.innerHTML = `
+        <div class="relative">
+          <div class="absolute -inset-3 rounded-full bg-red-500/20 animate-ping"></div>
+          <div class="absolute -inset-2 rounded-full bg-red-500/30 animate-pulse"></div>
+          <div class="relative w-10 h-10 rounded-full bg-gradient-to-br from-red-400 to-red-600 shadow-lg shadow-red-500/50 flex items-center justify-center border-2 border-white">
+            <div class="w-3 h-3 rounded-full bg-white"></div>
+          </div>
+          <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            ${t.dropoff}
+          </div>
+        </div>
+      `;
+    }
+    
+    return el;
+  };
+
+  const showActiveRideRoute = async () => {
+    if (!map.current || !activeRide) return;
+
+    // Clear any pending ride markers when showing active ride
+    rideMarkers.current.forEach(marker => marker.remove());
+    rideMarkers.current = [];
+
+    // Add pickup marker
+    if (!activeRideMarkers.current.pickup) {
+      activeRideMarkers.current.pickup = new mapboxgl.Marker({ element: createActiveRideMarker('pickup') })
+        .setLngLat([activeRide.pickup_lng, activeRide.pickup_lat])
+        .addTo(map.current);
+    } else {
+      activeRideMarkers.current.pickup.setLngLat([activeRide.pickup_lng, activeRide.pickup_lat]);
+    }
+
+    // Add dropoff marker
+    if (!activeRideMarkers.current.dropoff) {
+      activeRideMarkers.current.dropoff = new mapboxgl.Marker({ element: createActiveRideMarker('dropoff') })
+        .setLngLat([activeRide.dropoff_lng, activeRide.dropoff_lat])
+        .addTo(map.current);
+    } else {
+      activeRideMarkers.current.dropoff.setLngLat([activeRide.dropoff_lng, activeRide.dropoff_lat]);
+    }
+
+    // Calculate and draw route
+    try {
+      const startPoint = currentLocation 
+        ? `${currentLocation.lng},${currentLocation.lat}`
+        : `${activeRide.pickup_lng},${activeRide.pickup_lat}`;
+      const waypoints = currentLocation 
+        ? `${activeRide.pickup_lng},${activeRide.pickup_lat};${activeRide.dropoff_lng},${activeRide.dropoff_lat}`
+        : `${activeRide.dropoff_lng},${activeRide.dropoff_lat}`;
+      
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${startPoint};${waypoints}?geometries=geojson&access_token=${mapboxgl.accessToken}`
+      );
+      const data = await response.json();
+
+      if (data.routes && data.routes[0]) {
+        const route = data.routes[0].geometry;
+
+        // Remove existing route layers
+        if (map.current.getSource('active-route')) {
+          map.current.removeLayer('active-route-glow');
+          map.current.removeLayer('active-route-line');
+          map.current.removeSource('active-route');
+        }
+
+        // Add route source
+        map.current.addSource('active-route', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: route
+          }
+        });
+
+        // Add glow effect
+        map.current.addLayer({
+          id: 'active-route-glow',
+          type: 'line',
+          source: 'active-route',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#10b981',
+            'line-width': 10,
+            'line-opacity': 0.3,
+            'line-blur': 3
+          }
+        });
+
+        // Add main route line
+        map.current.addLayer({
+          id: 'active-route-line',
+          type: 'line',
+          source: 'active-route',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#10b981',
+            'line-width': 4,
+            'line-opacity': 1
+          }
+        });
+
+        // Fit map to show the entire route
+        const coordinates = route.coordinates;
+        const bounds = coordinates.reduce((bounds: mapboxgl.LngLatBounds, coord: [number, number]) => {
+          return bounds.extend(coord as mapboxgl.LngLatLike);
+        }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+
+        map.current.fitBounds(bounds, {
+          padding: { top: 100, bottom: 200, left: 50, right: 50 }
+        });
+      }
+    } catch (error) {
+      console.error('Error calculating route:', error);
+    }
+  };
+
   const acceptRide = async (rideId: string) => {
     try {
       // Only accept if the ride is still pending AND (unassigned OR already assigned to me)
@@ -421,6 +643,12 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
 
       if (locationError) {
         console.warn('Driver location busy update failed:', locationError);
+      }
+
+      // Set the accepted ride as active ride immediately
+      const acceptedRide = pendingRides.find(r => r.id === rideId);
+      if (acceptedRide) {
+        setActiveRide({ ...acceptedRide, driver_id: driverId });
       }
 
       toast.success(t.acceptSuccess);
@@ -515,13 +743,61 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
         </Card>
       )}
 
-      {isOnline && pendingRides.length > 0 && !selectedRide && (
+      {isOnline && pendingRides.length > 0 && !selectedRide && !activeRide && (
         <div className="absolute top-4 left-4 z-10">
           <Badge className="text-base px-4 py-2 bg-emerald-500 hover:bg-emerald-600 shadow-lg">
             <span className="animate-pulse mr-2">●</span>
             {pendingRides.length} {t.ridesNearby}
           </Badge>
         </div>
+      )}
+
+      {/* Active Ride Card */}
+      {activeRide && !selectedRide && (
+        <Card className="absolute bottom-4 left-4 right-4 z-20 shadow-2xl bg-background/95 backdrop-blur-sm border-emerald-500/50 border-2">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+              <h3 className="font-bold text-lg text-emerald-600">{t.activeRide}</h3>
+              {activeRide.estimated_price && (
+                <Badge className="ml-auto bg-emerald-500">{activeRide.estimated_price} TND</Badge>
+              )}
+            </div>
+            
+            <div className="space-y-2 mb-4">
+              <div className="flex items-start gap-3 p-2 rounded-lg bg-emerald-500/10">
+                <div className="w-3 h-3 rounded-full bg-emerald-500 mt-1 ring-2 ring-emerald-500/20" />
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-emerald-600 uppercase">{t.pickup}</p>
+                  <p className="text-sm text-foreground truncate">{activeRide.pickup_location}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-emerald-600 hover:bg-emerald-500/20"
+                  onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeRide.pickup_lat},${activeRide.pickup_lng}`, '_blank')}
+                >
+                  <Navigation className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-start gap-3 p-2 rounded-lg bg-red-500/10">
+                <div className="w-3 h-3 rounded-full bg-red-500 mt-1 ring-2 ring-red-500/20" />
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-red-600 uppercase">{t.dropoff}</p>
+                  <p className="text-sm text-foreground truncate">{activeRide.dropoff_location}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-red-600 hover:bg-red-500/20"
+                  onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeRide.dropoff_lat},${activeRide.dropoff_lng}`, '_blank')}
+                >
+                  <Navigation className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

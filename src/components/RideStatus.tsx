@@ -591,8 +591,8 @@ export default function RideStatus({ rideId, onRideComplete }: RideStatusProps) 
         </CardContent>
       </Card>
 
-      {/* Ride Chat only if driver is assigned */}
-      {ride.driver_id && <RideChat rideId={rideId} userRole="customer" />}
+      {/* Ride Chat only after driver accepts the ride */}
+      {ride.driver_id && ride.status !== 'pending' && <RideChat rideId={rideId} userRole="customer" />}
 
       {ride.status === 'completed' && !showRatingDialog && (
         <Card>

@@ -1,9 +1,21 @@
 import { useEffect, useState, useRef } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
-// Helper to show browser notification
-function showNotification(title: string, options?: NotificationOptions) {
-  if (window.Notification && Notification.permission === 'granted') {
-    new Notification(title, options);
+// Helper to show browser notification (with ServiceWorker fallback for mobile)
+async function showNotification(title: string, options?: NotificationOptions) {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+      return;
+    }
+    // Try ServiceWorker first (required for mobile browsers)
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(title, options);
+    } else {
+      // Fallback for desktop browsers
+      new Notification(title, options);
+    }
+  } catch (error) {
+    console.warn('Notification failed:', error);
   }
 }
 import { useAuth } from '@/hooks/useAuth';
