@@ -176,13 +176,15 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
+        style: 'mapbox://styles/mapbox/dark-v11',
         center: [defaultCenter.lng, defaultCenter.lat],
         zoom: 13,
+        pitch: 45,
+        bearing: -17.6,
       });
 
       map.current.addControl(
-        new mapboxgl.NavigationControl({ visualizePitch: false }),
+        new mapboxgl.NavigationControl({ visualizePitch: true }),
         'top-right'
       );
 
@@ -290,29 +292,57 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
     }
   };
 
+  const createModernMarker = (type: 'driver' | 'ride' | 'assigned') => {
+    const el = document.createElement('div');
+    el.className = 'modern-marker';
+    
+    if (type === 'driver') {
+      el.innerHTML = `
+        <div class="relative">
+          <div class="absolute -inset-3 rounded-full bg-blue-500/20 animate-ping"></div>
+          <div class="absolute -inset-2 rounded-full bg-blue-500/30 animate-pulse"></div>
+          <div class="relative w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg shadow-blue-500/50 flex items-center justify-center border-2 border-white text-lg">
+            🚗
+          </div>
+          <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            YOU
+          </div>
+        </div>
+      `;
+    } else if (type === 'assigned') {
+      el.innerHTML = `
+        <div class="relative">
+          <div class="absolute -inset-4 rounded-full bg-amber-500/20 animate-ping"></div>
+          <div class="absolute -inset-2 rounded-full bg-amber-500/30 animate-pulse"></div>
+          <div class="relative w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/50 flex items-center justify-center border-2 border-white">
+            <div class="w-2 h-2 rounded-full bg-white"></div>
+          </div>
+          <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            🎯 ASSIGNED
+          </div>
+        </div>
+      `;
+    } else {
+      el.innerHTML = `
+        <div class="relative">
+          <div class="absolute -inset-2 rounded-full bg-emerald-500/30 animate-pulse"></div>
+          <div class="relative w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/50 flex items-center justify-center border-2 border-white">
+            <div class="w-2 h-2 rounded-full bg-white"></div>
+          </div>
+        </div>
+      `;
+    }
+    
+    return el;
+  };
+
   const updateDriverMarker = () => {
     if (!map.current || !currentLocation) return;
 
     if (driverMarker.current) {
       driverMarker.current.setLngLat([currentLocation.lng, currentLocation.lat]);
     } else {
-      const el = document.createElement('div');
-      el.className = 'driver-marker';
-      el.innerHTML = `
-        <div style="
-          width: 40px;
-          height: 40px;
-          background: #3b82f6;
-          border: 4px solid white;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 20px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        ">🚗</div>
-      `;
-      driverMarker.current = new mapboxgl.Marker({ element: el })
+      driverMarker.current = new mapboxgl.Marker({ element: createModernMarker('driver') })
         .setLngLat([currentLocation.lng, currentLocation.lat])
         .addTo(map.current);
     }
@@ -329,22 +359,18 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
     pendingRides.forEach((ride) => {
       const isAssignedToMe = ride.driver_id === driverId;
       
-      const el = document.createElement('div');
-      el.className = 'ride-marker';
-      el.innerHTML = `
-        <div style="
-          background: ${isAssignedToMe ? '#f59e0b' : '#10b981'};
-          color: white;
-          padding: 8px 12px;
-          border-radius: 20px;
-          font-weight: bold;
-          font-size: 14px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-          cursor: pointer;
-          white-space: nowrap;
-          animation: ${isAssignedToMe ? 'pulse 2s infinite' : 'none'};
-        ">${isAssignedToMe ? '🎯' : '📍'} ${ride.estimated_price ? `${ride.estimated_price} TND` : 'New'}</div>
+      const el = createModernMarker(isAssignedToMe ? 'assigned' : 'ride');
+      el.style.cursor = 'pointer';
+      
+      // Add price badge
+      const priceEl = document.createElement('div');
+      priceEl.className = 'absolute -top-8 left-1/2 -translate-x-1/2';
+      priceEl.innerHTML = `
+        <div class="bg-black/80 text-white text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap shadow-lg backdrop-blur-sm">
+          ${ride.estimated_price ? `${ride.estimated_price} TND` : 'New'}
+        </div>
       `;
+      el.querySelector('.relative')?.appendChild(priceEl);
       
       el.onclick = () => setSelectedRide(ride);
       
@@ -407,22 +433,25 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   };
 
   return (
-    <div className="relative w-full h-[600px]">
+    <div className="relative w-full h-[600px] rounded-xl overflow-hidden">
       {loading && (
-        <div className="absolute inset-0 bg-muted flex items-center justify-center z-10 rounded-lg">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">{t.loadingMap}</p>
+        <div className="absolute inset-0 bg-background flex items-center justify-center z-10">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <span className="text-sm text-muted-foreground">{t.loadingMap}</span>
           </div>
         </div>
       )}
       
-      <div ref={mapContainer} className="w-full h-full rounded-lg" />
+      <div ref={mapContainer} className="w-full h-full" />
       
       {!isOnline && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-lg">
-          <Card>
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
+          <Card className="bg-background/95 backdrop-blur-sm border-none shadow-2xl">
             <CardContent className="pt-6 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+                <Navigation className="w-8 h-8 text-muted-foreground" />
+              </div>
               <p className="text-lg font-semibold mb-2">{t.youAreOffline}</p>
               <p className="text-sm text-muted-foreground">{t.goOnline}</p>
             </CardContent>
@@ -431,37 +460,38 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       )}
 
       {selectedRide && (
-        <Card className="absolute bottom-4 left-4 right-4 z-20 shadow-2xl">
+        <Card className="absolute bottom-4 left-4 right-4 z-20 shadow-2xl bg-background/95 backdrop-blur-sm border-none">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="font-bold text-lg mb-1">{t.newRideRequest}</h3>
                 {selectedRide.estimated_price && (
-                  <Badge className="text-base">{selectedRide.estimated_price} TND</Badge>
+                  <Badge className="text-base bg-emerald-500 hover:bg-emerald-600">{selectedRide.estimated_price} TND</Badge>
                 )}
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedRide(null)}
+                className="rounded-full"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
             
-            <div className="space-y-2 mb-4">
-              <div className="flex items-start gap-2">
-                <MapPin className="h-5 w-5 text-green-500 mt-0.5" />
+            <div className="space-y-3 mb-4">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/10">
+                <div className="w-3 h-3 rounded-full bg-emerald-500 mt-1.5 ring-4 ring-emerald-500/20" />
                 <div>
-                  <p className="text-sm font-medium">{t.pickup}</p>
-                  <p className="text-sm text-muted-foreground">{selectedRide.pickup_location}</p>
+                  <p className="text-xs font-medium text-emerald-600 uppercase">{t.pickup}</p>
+                  <p className="text-sm text-foreground">{selectedRide.pickup_location}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="h-5 w-5 text-red-500 mt-0.5" />
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-red-500/10">
+                <div className="w-3 h-3 rounded-full bg-red-500 mt-1.5 ring-4 ring-red-500/20" />
                 <div>
-                  <p className="text-sm font-medium">{t.dropoff}</p>
-                  <p className="text-sm text-muted-foreground">{selectedRide.dropoff_location}</p>
+                  <p className="text-xs font-medium text-red-600 uppercase">{t.dropoff}</p>
+                  <p className="text-sm text-foreground">{selectedRide.dropoff_location}</p>
                 </div>
               </div>
             </div>
@@ -469,7 +499,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
             <div className="flex gap-2">
               <Button
                 onClick={() => acceptRide(selectedRide.id)}
-                className="flex-1"
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 {t.acceptRide}
@@ -487,7 +517,8 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
 
       {isOnline && pendingRides.length > 0 && !selectedRide && (
         <div className="absolute top-4 left-4 z-10">
-          <Badge className="text-base px-4 py-2">
+          <Badge className="text-base px-4 py-2 bg-emerald-500 hover:bg-emerald-600 shadow-lg">
+            <span className="animate-pulse mr-2">●</span>
             {pendingRides.length} {t.ridesNearby}
           </Badge>
         </div>
