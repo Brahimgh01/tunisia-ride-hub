@@ -227,6 +227,9 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   useEffect(() => {
     if (map.current && activeRide) {
       showActiveRideRoute();
+    } else if (map.current && !activeRide) {
+      // Clear markers and route when ride is cancelled/completed
+      clearActiveRideMarkers();
     }
   }, [activeRide, currentLocation]);
 
@@ -455,10 +458,20 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       activeRideMarkers.current.dropoff = undefined;
     }
     // Remove route layer if exists
-    if (map.current?.getSource('active-route')) {
-      map.current.removeLayer('active-route-glow');
-      map.current.removeLayer('active-route-line');
-      map.current.removeSource('active-route');
+    if (map.current) {
+      try {
+        if (map.current.getLayer('active-route-glow')) {
+          map.current.removeLayer('active-route-glow');
+        }
+        if (map.current.getLayer('active-route-line')) {
+          map.current.removeLayer('active-route-line');
+        }
+        if (map.current.getSource('active-route')) {
+          map.current.removeSource('active-route');
+        }
+      } catch (e) {
+        console.warn('Error clearing route layers:', e);
+      }
     }
   };
 
@@ -775,7 +788,10 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
                   size="sm"
                   variant="ghost"
                   className="h-8 text-emerald-600 hover:bg-emerald-500/20"
-                  onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeRide.pickup_lat},${activeRide.pickup_lng}`, '_blank')}
+                  onClick={() => {
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${activeRide.pickup_lat},${activeRide.pickup_lng}&travelmode=driving`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
                 >
                   <Navigation className="h-4 w-4" />
                 </Button>
@@ -790,7 +806,10 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
                   size="sm"
                   variant="ghost"
                   className="h-8 text-red-600 hover:bg-red-500/20"
-                  onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeRide.dropoff_lat},${activeRide.dropoff_lng}`, '_blank')}
+                  onClick={() => {
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${activeRide.dropoff_lat},${activeRide.dropoff_lng}&travelmode=driving`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
                 >
                   <Navigation className="h-4 w-4" />
                 </Button>
