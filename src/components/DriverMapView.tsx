@@ -107,6 +107,8 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   const [activeRide, setActiveRide] = useState<PendingRide | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const ACTIVE_RIDE_STATUSES = ['accepted', 'driver_en_route', 'driver_arrived', 'in_progress'] as const;
+
   const defaultCenter = { lat: 36.8065, lng: 10.1815 }; // Tunis
 
   useEffect(() => {
@@ -115,6 +117,15 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       map.current?.remove();
     };
   }, []);
+
+  // When going offline, clear any in-map ride UI immediately (card + route + markers)
+  useEffect(() => {
+    if (isOnline) return;
+    setSelectedRide(null);
+    setPendingRides([]);
+    setActiveRide(null);
+    clearActiveRideMarkers();
+  }, [isOnline]);
 
   // Fetch active ride on mount and subscribe to updates
   useEffect(() => {
@@ -125,7 +136,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
         .from('rides')
         .select('*')
         .eq('driver_id', driverId)
-        .in('status', ['accepted', 'driver_en_route', 'driver_arrived', 'in_progress'])
+        .in('status', [...ACTIVE_RIDE_STATUSES])
         .order('accepted_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -145,7 +156,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
         { event: 'UPDATE', schema: 'public', table: 'rides', filter: `driver_id=eq.${driverId}` },
         (payload) => {
           const ride = payload.new as any;
-          if (['accepted', 'driver_en_route', 'driver_arrived', 'in_progress'].includes(ride.status)) {
+          if (ACTIVE_RIDE_STATUSES.includes(ride.status)) {
             setActiveRide(ride as PendingRide);
           } else {
             // Ride completed or cancelled
@@ -160,6 +171,38 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       supabase.removeChannel(channel);
     };
   }, [isOnline, driverId]);
+
+  // If the driver cancels/relinquishes a ride, DriverDashboard/DriverRideManagement sets driver_id to null.
+  // In that case, the above `driver_id=eq.${driverId}` subscription won't fire, so we also watch by ride id.
+  useEffect(() => {
+    if (!activeRide?.id || !driverId) return;
+
+    const channel = supabase
+      .channel(`active-ride-watch-${activeRide.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${activeRide.id}` },
+        (payload) => {
+          const ride = payload.new as any;
+          if (!ride) return;
+
+          // If it no longer belongs to me or is no longer in an active status, clear UI immediately.
+          if (ride.driver_id !== driverId || !ACTIVE_RIDE_STATUSES.includes(ride.status)) {
+            setActiveRide(null);
+            setSelectedRide(null);
+            clearActiveRideMarkers();
+            return;
+          }
+
+          setActiveRide(ride as PendingRide);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeRide?.id, driverId]);
 
   useEffect(() => {
     if (isOnline && map.current) {
@@ -232,6 +275,12 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       clearActiveRideMarkers();
     }
   }, [activeRide, currentLocation]);
+
+  const buildGoogleMapsDirectionsUrl = (lat: number, lng: number) => {
+    const destination = `${lat},${lng}`;
+    const origin = currentLocation ? `${currentLocation.lat},${currentLocation.lng}` : 'My Location';
+    return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+  };
 
   const initializeMap = async () => {
     try {
@@ -766,7 +815,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       )}
 
       {/* Active Ride Card */}
-      {activeRide && !selectedRide && (
+      {isOnline && activeRide && !selectedRide && (
         <Card className="absolute bottom-4 left-4 right-4 z-20 shadow-2xl bg-background/95 backdrop-blur-sm border-emerald-500/50 border-2">
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 mb-3">
@@ -788,12 +837,16 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
                   size="sm"
                   variant="ghost"
                   className="h-8 text-emerald-600 hover:bg-emerald-500/20"
-                  onClick={() => {
-                    const url = `https://www.google.com/maps/dir/?api=1&destination=${activeRide.pickup_lat},${activeRide.pickup_lng}&travelmode=driving`;
-                    window.open(url, '_blank', 'noopener,noreferrer');
-                  }}
+                  asChild
                 >
-                  <Navigation className="h-4 w-4" />
+                  <a
+                    href={buildGoogleMapsDirectionsUrl(activeRide.pickup_lat, activeRide.pickup_lng)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={t.navigateToPickup}
+                  >
+                    <Navigation className="h-4 w-4" />
+                  </a>
                 </Button>
               </div>
               <div className="flex items-start gap-3 p-2 rounded-lg bg-red-500/10">
@@ -806,12 +859,16 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
                   size="sm"
                   variant="ghost"
                   className="h-8 text-red-600 hover:bg-red-500/20"
-                  onClick={() => {
-                    const url = `https://www.google.com/maps/dir/?api=1&destination=${activeRide.dropoff_lat},${activeRide.dropoff_lng}&travelmode=driving`;
-                    window.open(url, '_blank', 'noopener,noreferrer');
-                  }}
+                  asChild
                 >
-                  <Navigation className="h-4 w-4" />
+                  <a
+                    href={buildGoogleMapsDirectionsUrl(activeRide.dropoff_lat, activeRide.dropoff_lng)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={t.navigateToDropoff}
+                  >
+                    <Navigation className="h-4 w-4" />
+                  </a>
                 </Button>
               </div>
             </div>
