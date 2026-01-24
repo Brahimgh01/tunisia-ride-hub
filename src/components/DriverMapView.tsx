@@ -987,21 +987,6 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
                   <p className="text-xs font-medium text-emerald-600 uppercase">{t.pickup}</p>
                   <p className="text-sm text-foreground truncate">{activeRide.pickup_location}</p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 text-emerald-600 hover:bg-emerald-500/20"
-                  asChild
-                >
-                  <a
-                    href={buildGoogleMapsDirectionsUrl(activeRide.pickup_lat, activeRide.pickup_lng)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={t.navigateToPickup}
-                  >
-                    <Navigation className="h-4 w-4" />
-                  </a>
-                </Button>
               </div>
               <div className="flex items-start gap-3 p-2 rounded-lg bg-red-500/10">
                 <div className="w-3 h-3 rounded-full bg-red-500 mt-1 ring-2 ring-red-500/20" />
@@ -1009,21 +994,6 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
                   <p className="text-xs font-medium text-red-600 uppercase">{t.dropoff}</p>
                   <p className="text-sm text-foreground truncate">{activeRide.dropoff_location}</p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 text-red-600 hover:bg-red-500/20"
-                  asChild
-                >
-                  <a
-                    href={buildGoogleMapsDirectionsUrl(activeRide.dropoff_lat, activeRide.dropoff_lng)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={t.navigateToDropoff}
-                  >
-                    <Navigation className="h-4 w-4" />
-                  </a>
-                </Button>
               </div>
             </div>
           </CardContent>
