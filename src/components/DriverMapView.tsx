@@ -100,6 +100,7 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
   const driverMarker = useRef<mapboxgl.Marker | null>(null);
   const rideMarkers = useRef<mapboxgl.Marker[]>([]);
   const activeRideMarkers = useRef<{ pickup?: mapboxgl.Marker; dropoff?: mapboxgl.Marker }>({});
+  const previewRideMarkers = useRef<{ pickup?: mapboxgl.Marker; dropoff?: mapboxgl.Marker }>({});
   
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [pendingRides, setPendingRides] = useState<PendingRide[]>([]);
@@ -275,6 +276,15 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       clearActiveRideMarkers();
     }
   }, [activeRide, currentLocation]);
+
+  // Show preview route when driver clicks on a pending ride (before accepting)
+  useEffect(() => {
+    if (map.current && selectedRide && !activeRide) {
+      showPreviewRoute(selectedRide);
+    } else if (map.current && !selectedRide) {
+      clearPreviewMarkers();
+    }
+  }, [selectedRide, activeRide]);
 
   const buildGoogleMapsDirectionsUrl = (lat: number, lng: number) => {
     const destination = `${lat},${lng}`;
@@ -521,6 +531,150 @@ export default function DriverMapView({ isOnline, driverId }: DriverMapViewProps
       } catch (e) {
         console.warn('Error clearing route layers:', e);
       }
+    }
+  };
+
+  const clearPreviewMarkers = () => {
+    if (previewRideMarkers.current.pickup) {
+      previewRideMarkers.current.pickup.remove();
+      previewRideMarkers.current.pickup = undefined;
+    }
+    if (previewRideMarkers.current.dropoff) {
+      previewRideMarkers.current.dropoff.remove();
+      previewRideMarkers.current.dropoff = undefined;
+    }
+    // Remove preview route layer if exists
+    if (map.current) {
+      try {
+        if (map.current.getLayer('preview-route-glow')) {
+          map.current.removeLayer('preview-route-glow');
+        }
+        if (map.current.getLayer('preview-route-line')) {
+          map.current.removeLayer('preview-route-line');
+        }
+        if (map.current.getSource('preview-route')) {
+          map.current.removeSource('preview-route');
+        }
+      } catch (e) {
+        console.warn('Error clearing preview route layers:', e);
+      }
+    }
+  };
+
+  const createPreviewMarker = (type: 'pickup' | 'dropoff') => {
+    const el = document.createElement('div');
+    el.className = 'preview-ride-marker';
+    
+    if (type === 'pickup') {
+      el.innerHTML = `
+        <div class="relative">
+          <div class="absolute -inset-2 rounded-full bg-amber-500/30 animate-pulse"></div>
+          <div class="relative w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/50 flex items-center justify-center border-2 border-white">
+            <div class="w-2 h-2 rounded-full bg-white"></div>
+          </div>
+          <div class="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            ${t.pickup}
+          </div>
+        </div>
+      `;
+    } else {
+      el.innerHTML = `
+        <div class="relative">
+          <div class="absolute -inset-2 rounded-full bg-orange-500/30 animate-pulse"></div>
+          <div class="relative w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg shadow-orange-500/50 flex items-center justify-center border-2 border-white">
+            <div class="w-2 h-2 rounded-full bg-white"></div>
+          </div>
+          <div class="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            ${t.dropoff}
+          </div>
+        </div>
+      `;
+    }
+    
+    return el;
+  };
+
+  const showPreviewRoute = async (ride: PendingRide) => {
+    if (!map.current || !ride) return;
+
+    // Clear any previous preview
+    clearPreviewMarkers();
+
+    // Add pickup marker
+    previewRideMarkers.current.pickup = new mapboxgl.Marker({ element: createPreviewMarker('pickup') })
+      .setLngLat([ride.pickup_lng, ride.pickup_lat])
+      .addTo(map.current);
+
+    // Add dropoff marker
+    previewRideMarkers.current.dropoff = new mapboxgl.Marker({ element: createPreviewMarker('dropoff') })
+      .setLngLat([ride.dropoff_lng, ride.dropoff_lat])
+      .addTo(map.current);
+
+    // Calculate and draw preview route
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${ride.pickup_lng},${ride.pickup_lat};${ride.dropoff_lng},${ride.dropoff_lat}?geometries=geojson&access_token=${mapboxgl.accessToken}`
+      );
+      const data = await response.json();
+
+      if (data.routes && data.routes[0]) {
+        const route = data.routes[0].geometry;
+
+        // Add route source
+        map.current.addSource('preview-route', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: route
+          }
+        });
+
+        // Add glow effect
+        map.current.addLayer({
+          id: 'preview-route-glow',
+          type: 'line',
+          source: 'preview-route',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#f59e0b',
+            'line-width': 8,
+            'line-opacity': 0.3,
+            'line-blur': 3
+          }
+        });
+
+        // Add main route line
+        map.current.addLayer({
+          id: 'preview-route-line',
+          type: 'line',
+          source: 'preview-route',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#f59e0b',
+            'line-width': 4,
+            'line-opacity': 1
+          }
+        });
+
+        // Fit map to show the entire route
+        const coordinates = route.coordinates;
+        const bounds = coordinates.reduce((bounds: mapboxgl.LngLatBounds, coord: [number, number]) => {
+          return bounds.extend(coord as mapboxgl.LngLatLike);
+        }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+
+        map.current.fitBounds(bounds, {
+          padding: { top: 100, bottom: 250, left: 50, right: 50 }
+        });
+      }
+    } catch (error) {
+      console.error('Error calculating preview route:', error);
     }
   };
 
