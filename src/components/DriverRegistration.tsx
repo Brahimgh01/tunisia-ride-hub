@@ -179,8 +179,8 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
   const [step, setStep] = useState(1);
   const totalSteps = 4;
   
-  // Vehicle details
-  const [vehicleType, setVehicleType] = useState<string>('');
+  // Vehicle details - taxi only, no selection needed
+  const vehicleType = 'taxi';
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleColor, setVehicleColor] = useState('');
   const [licensePlate, setLicensePlate] = useState('');
@@ -298,7 +298,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
     onRegistrationComplete();
   };
 
-  const canProceedToStep2 = vehicleType && vehicleModel && vehicleColor && licensePlate;
+  const canProceedToStep2 = vehicleModel && vehicleColor && licensePlate;
   const canProceedToStep3 = idFrontFile && idBackFile && licenseFile;
   const canSubmit = vehicleRegFile && carPhotoFile;
 
@@ -349,21 +349,6 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
               <div className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="vehicle-type">{t.vehicleType} *</Label>
-                    <Select onValueChange={setVehicleType} value={vehicleType} required>
-                      <SelectTrigger id="vehicle-type">
-                        <SelectValue placeholder={t.selectVehicleType} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="taxi">🚕 {t.taxi}</SelectItem>
-                        <SelectItem value="premium">👑 {t.premiumCar}</SelectItem>
-                        <SelectItem value="carpooling">👥 {t.carpoolingCar}</SelectItem>
-                        <SelectItem value="motorcycle">🏍️ {t.motorcycle}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
                     <Label htmlFor="vehicleModel">{t.vehicleModel} *</Label>
                     <Input 
                       id="vehicleModel" 
@@ -385,7 +370,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="licensePlate">{t.licensePlate} *</Label>
                     <Input 
                       id="licensePlate" 
