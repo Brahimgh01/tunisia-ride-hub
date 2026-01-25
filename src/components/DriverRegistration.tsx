@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Upload, Check, Camera, Car, CreditCard, FileText, Shield } from 'lucide-react';
+import { Upload, Check, Camera, Car, FileText, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import type { Language } from '@/lib/types';
@@ -50,12 +50,11 @@ const translations = {
     completeAllSteps: 'Please complete all steps and upload all required documents.',
     uploadingDocs: 'Uploading documents...',
     creatingProfile: 'Creating driver profile...',
-    registrationComplete: 'Registration complete! You have 1 month free trial. You can now accept rides!',
+    registrationComplete: 'Registration complete! You can now accept rides!',
     stepVehicleInfo: 'Vehicle Info',
     stepIdDocuments: 'ID Documents',
     stepLicenseReg: 'License & Registration',
     stepReview: 'Review',
-    stepSubscription: 'Subscription',
     reviewYourInfo: 'Review your information before submitting',
     yourVehicle: 'Your Vehicle',
     uploadedDocuments: 'Uploaded Documents',
@@ -63,10 +62,6 @@ const translations = {
     drivingLicenseUploaded: 'Driving License',
     vehicleRegUploaded: 'Vehicle Registration',
     carPhotoUploaded: 'Car Photo',
-    subscriptionInfo: 'Subscription Information',
-    freeTrialTitle: '1 Month Free Trial',
-    freeTrialDesc: 'Start accepting rides immediately with no fees for your first month',
-    afterTrial: 'After trial: 50 TND/month',
     submitting: 'Submitting...',
   },
   fr: {
@@ -106,12 +101,11 @@ const translations = {
     completeAllSteps: 'Veuillez compléter toutes les étapes et télécharger tous les documents requis.',
     uploadingDocs: 'Téléchargement des documents...',
     creatingProfile: 'Création du profil chauffeur...',
-    registrationComplete: 'Inscription terminée! Vous avez 1 mois d\'essai gratuit. Vous pouvez maintenant accepter des courses!',
+    registrationComplete: 'Inscription terminée! Vous pouvez maintenant accepter des courses!',
     stepVehicleInfo: 'Véhicule',
     stepIdDocuments: 'Documents ID',
     stepLicenseReg: 'Permis & Carte Grise',
     stepReview: 'Révision',
-    stepSubscription: 'Abonnement',
     reviewYourInfo: 'Vérifiez vos informations avant de soumettre',
     yourVehicle: 'Votre véhicule',
     uploadedDocuments: 'Documents téléchargés',
@@ -119,10 +113,6 @@ const translations = {
     drivingLicenseUploaded: 'Permis de conduire',
     vehicleRegUploaded: 'Carte Grise',
     carPhotoUploaded: 'Photo du véhicule',
-    subscriptionInfo: 'Informations d\'abonnement',
-    freeTrialTitle: '1 Mois d\'essai gratuit',
-    freeTrialDesc: 'Commencez à accepter des courses immédiatement sans frais pendant votre premier mois',
-    afterTrial: 'Après l\'essai: 50 TND/mois',
     submitting: 'Soumission...',
   },
   ar: {
@@ -162,12 +152,11 @@ const translations = {
     completeAllSteps: 'يرجى إكمال جميع الخطوات وتحميل جميع المستندات المطلوبة.',
     uploadingDocs: 'جاري تحميل المستندات...',
     creatingProfile: 'جاري إنشاء ملف السائق...',
-    registrationComplete: 'اكتمل التسجيل! لديك شهر واحد تجريبي مجاني. يمكنك الآن قبول الرحلات!',
+    registrationComplete: 'اكتمل التسجيل! يمكنك الآن قبول الرحلات!',
     stepVehicleInfo: 'المركبة',
     stepIdDocuments: 'الهوية',
     stepLicenseReg: 'الرخصة والبطاقة',
     stepReview: 'مراجعة',
-    stepSubscription: 'الاشتراك',
     reviewYourInfo: 'راجع معلوماتك قبل الإرسال',
     yourVehicle: 'مركبتك',
     uploadedDocuments: 'المستندات المحملة',
@@ -175,10 +164,6 @@ const translations = {
     drivingLicenseUploaded: 'رخصة القيادة',
     vehicleRegUploaded: 'البطاقة الرمادية',
     carPhotoUploaded: 'صورة السيارة',
-    subscriptionInfo: 'معلومات الاشتراك',
-    freeTrialTitle: 'شهر واحد تجريبي مجاني',
-    freeTrialDesc: 'ابدأ بقبول الرحلات فوراً بدون رسوم خلال شهرك الأول',
-    afterTrial: 'بعد التجربة: 50 دينار/شهر',
     submitting: 'جاري الإرسال...',
   },
 };
@@ -192,7 +177,7 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
   const t = translations[language] || translations.en;
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
-  const totalSteps = 5;
+  const totalSteps = 4;
   
   // Vehicle details
   const [vehicleType, setVehicleType] = useState<string>('');
@@ -294,41 +279,6 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
 
     toast.dismiss();
 
-    // Create subscription with 1-month free trial
-    const trialStartDate = new Date();
-    const trialEndDate = new Date();
-    trialEndDate.setMonth(trialEndDate.getMonth() + 1);
-
-    // Upsert driver subscription (insert or update if exists)
-    const { error: subscriptionError } = await supabase
-      .from('driver_subscriptions')
-      .upsert({
-        driver_id: user.id,
-        license_number: licensePlate || '',
-        car_number: licensePlate || '',
-        vehicle_type: vehicleType || '',
-        vehicle_model: vehicleModel || '',
-        vehicle_color: vehicleColor || '',
-        status: 'active',
-        is_trial: true,
-        trial_start_date: trialStartDate.toISOString(),
-        trial_end_date: trialEndDate.toISOString(),
-        subscription_start_date: trialStartDate.toISOString(),
-        subscription_end_date: trialEndDate.toISOString(),
-        subscription_type: 'monthly',
-        monthly_fee: 50.00
-      }, {
-        onConflict: 'driver_id'
-      })
-      .select();
-
-    if (subscriptionError) {
-      console.error('Error creating subscription:', subscriptionError);
-      toast.error(subscriptionError.message || 'Failed to create subscription. Please try again.');
-      setLoading(false);
-      return;
-    }
-
     // Auto-verify driver (no admin approval needed)
     const { error: verifyError } = await supabase
       .from('driver_profiles')
@@ -358,14 +308,14 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            {[1, 2, 3, 4, 5].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex items-center">
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
                   step >= s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}>
                   {step > s ? <Check className="h-5 w-5" /> : s}
                 </div>
-                {s < 5 && <div className={`h-1 w-16 mx-2 ${step > s ? 'bg-primary' : 'bg-muted'}`} />}
+                {s < 4 && <div className={`h-1 w-16 mx-2 ${step > s ? 'bg-primary' : 'bg-muted'}`} />}
               </div>
             ))}
           </div>
@@ -374,7 +324,6 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
             <span>{t.stepIdDocuments}</span>
             <span>{t.stepLicenseReg}</span>
             <span>{t.stepReview}</span>
-            <span>{t.stepSubscription}</span>
           </div>
         </div>
 
@@ -640,24 +589,6 @@ export default function DriverRegistration({ onRegistrationComplete }: DriverReg
                         <Check className="h-4 w-4 text-green-600" /> {t.carPhotoUploaded}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* Step 5: Subscription & Free Trial */}
-            {step === 5 && (
-              <div className="space-y-6">
-                <Card className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-green-600" /> {t.subscriptionInfo}
-                    </h3>
-                    <div className="text-lg mb-2">
-                      <span className="font-bold text-green-700 dark:text-green-300">{t.freeTrialTitle}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-4">{t.freeTrialDesc}</p>
-                    <p className="text-sm text-muted-foreground">{t.afterTrial}</p>
                   </CardContent>
                 </Card>
               </div>

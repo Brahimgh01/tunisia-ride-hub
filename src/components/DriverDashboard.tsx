@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import DriverRideManagement from './DriverRideManagement';
@@ -12,7 +12,7 @@ import DriverRegistration from './DriverRegistration';
 import DriverMapView from './DriverMapView';
 import { NotificationBell } from './NotificationBell';
 import { Profile } from '@/lib/types';
-import { MapPin, Navigation2, DollarSign, Star, Clock, CheckCircle, TrendingUp, Activity, CreditCard, Calendar } from 'lucide-react';
+import { Navigation2, DollarSign, Star, Clock, CheckCircle, Activity } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 interface Location {
@@ -25,14 +25,6 @@ interface DriverStats {
   todayRides: number;
   totalEarnings: number;
   avgRating: number;
-}
-
-interface SubscriptionInfo {
-  isTrial: boolean;
-  trialEndDate: string | null;
-  subscriptionEndDate: string | null;
-  status: string;
-  isActive: boolean;
 }
 
 export default function DriverDashboard() {
@@ -50,13 +42,6 @@ export default function DriverDashboard() {
     todayRides: 0,
     totalEarnings: 0,
     avgRating: 0
-  });
-  const [subscription, setSubscription] = useState<SubscriptionInfo>({
-    isTrial: false,
-    trialEndDate: null,
-    subscriptionEndDate: null,
-    status: 'inactive',
-    isActive: false
   });
 
   // Translations
@@ -77,17 +62,10 @@ export default function DriverDashboard() {
       rating: 'التقييم',
       online: 'متصل',
       offline: 'غير متصل',
-      subscription: 'الاشتراك',
-      trial: 'تجريبي',
-      active: 'نشط',
-      expired: 'منتهي',
-      daysLeft: 'أيام متبقية',
       nearbyRequests: 'الطلبات القريبة',
       verified: 'موثق',
       allTime: 'كل الوقت',
-      today: 'اليوم',
-      subscriptionRequired: 'الاشتراك مطلوب',
-      renewSubscription: 'جدد اشتراكك لقبول الرحلات.'
+      today: 'اليوم'
     },
     en: {
       title: 'Driver Dashboard',
@@ -105,17 +83,10 @@ export default function DriverDashboard() {
       rating: 'Rating',
       online: 'Online',
       offline: 'Offline',
-      subscription: 'Subscription',
-      trial: 'Trial',
-      active: 'Active',
-      expired: 'Expired',
-      daysLeft: 'days left',
       nearbyRequests: 'Nearby Requests',
       verified: 'Verified',
       allTime: 'All time',
-      today: 'Today',
-      subscriptionRequired: 'Subscription Required',
-      renewSubscription: 'Renew your subscription to accept rides.'
+      today: 'Today'
     },
     fr: {
       title: 'Tableau de bord Chauffeur',
@@ -133,17 +104,10 @@ export default function DriverDashboard() {
       rating: 'Note',
       online: 'En ligne',
       offline: 'Hors ligne',
-      subscription: 'Abonnement',
-      trial: 'Essai',
-      active: 'Actif',
-      expired: 'Expiré',
-      daysLeft: 'jours restants',
       nearbyRequests: 'Demandes à proximité',
       verified: 'Vérifié',
       allTime: 'Total',
-      today: 'Aujourd\'hui',
-      subscriptionRequired: 'Abonnement requis',
-      renewSubscription: 'Renouvelez votre abonnement pour accepter des courses.'
+      today: 'Aujourd\'hui'
     }
   }[language];
 
@@ -192,7 +156,6 @@ export default function DriverDashboard() {
               // If not verified, force offline
               setIsAvailable(driverData.is_verified ? (driverData.is_available || false) : false);
               await fetchDriverStats();
-              await fetchSubscription();
             } else {
               setIsRegistered(false);
             }
@@ -209,59 +172,6 @@ export default function DriverDashboard() {
       setLoading(false);
     }
   }, [user]);
-
-  const fetchSubscription = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('driver_subscriptions')
-      .select('*')
-      .eq('driver_id', user.id)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Subscription fetch error:', error);
-      setSubscription({
-        isTrial: false,
-        trialEndDate: null,
-        subscriptionEndDate: null,
-        status: 'inactive',
-        isActive: false
-      });
-      return;
-    }
-    
-    if (!data) {
-      // No subscription exists
-      setSubscription({
-        isTrial: false,
-        trialEndDate: null,
-        subscriptionEndDate: null,
-        status: 'inactive',
-        isActive: false
-      });
-      return;
-    }
-    
-    if (data) {
-      const now = new Date();
-      const endDate = data.is_trial && data.trial_end_date
-        ? new Date(data.trial_end_date)
-        : data.subscription_end_date
-        ? new Date(data.subscription_end_date)
-        : null;
-      
-      const isActive = endDate ? endDate > now : data.status === 'active';
-      
-      setSubscription({
-        isTrial: data.is_trial || false,
-        trialEndDate: data.trial_end_date,
-        subscriptionEndDate: data.subscription_end_date,
-        status: data.status,
-        isActive
-      });
-    }
-  };
 
   const fetchDriverStats = async () => {
     if (!user) return;
@@ -511,22 +421,16 @@ export default function DriverDashboard() {
                     id="availability-switch"
                     checked={isAvailable}
                     onCheckedChange={handleAvailabilityChange}
-                    disabled={availabilityUpdating || !subscription.isActive || !isVerified}
+                    disabled={availabilityUpdating || !isVerified}
                   />
                   <Label htmlFor="availability-switch" className="cursor-pointer font-medium">
                     {t.availability}
                   </Label>
                 </div>
                 {!isVerified && (
-                  <div className="text-xs mt-2 p-2 bg-red-500/10 rounded border border-red-500/20">
-                    <p className="text-red-600 dark:text-red-400 font-medium">⚠️ {language === 'ar' ? 'الحساب موقوف' : language === 'fr' ? 'Compte suspendu' : 'Account Suspended'}</p>
+                  <div className="text-xs mt-2 p-2 bg-destructive/10 rounded border border-destructive/20">
+                    <p className="text-destructive font-medium">⚠️ {language === 'ar' ? 'الحساب موقوف' : language === 'fr' ? 'Compte suspendu' : 'Account Suspended'}</p>
                     <p className="text-muted-foreground mt-1">{language === 'ar' ? 'حسابك غير موثق حاليًا. تواصل مع الدعم.' : language === 'fr' ? 'Votre compte n\'est pas vérifié. Contactez le support.' : 'Your account is not verified. Contact support.'}</p>
-                  </div>
-                )}
-                {isVerified && !subscription.isActive && (
-                  <div className="text-xs mt-2 p-2 bg-red-500/10 rounded border border-red-500/20">
-                    <p className="text-red-600 dark:text-red-400 font-medium">⚠️ {t?.subscriptionRequired}</p>
-                    <p className="text-muted-foreground mt-1">{t?.renewSubscription}</p>
                   </div>
                 )}
               </CardContent>
@@ -600,82 +504,6 @@ export default function DriverDashboard() {
           </Card>
         </div>
 
-        {/* Subscription Status */}
-        <Card className={`${subscription.isActive ? 'border-green-500' : 'border-red-500'}`}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                {t.subscription}
-              </CardTitle>
-              <Badge variant={subscription.isActive ? "default" : "destructive"}>
-                {subscription.isTrial ? t.trial : subscription.isActive ? t.active : t.expired}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {subscription.isActive ? (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">
-                  {subscription.isTrial ? 'Free Trial' : 'Subscription'} ends in:
-                </p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {Math.max(0, Math.ceil((new Date(subscription.isTrial && subscription.trialEndDate ? subscription.trialEndDate : subscription.subscriptionEndDate || '').getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days
-                </p>
-                {subscription.isTrial && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    🎉 Enjoy your free trial! No payment required yet.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-                  Your subscription has expired. Renew to continue accepting rides.
-                </p>
-                <Button 
-                  className="w-full" 
-                  size="sm"
-                    onClick={async () => {
-                      if (!user) {
-                        toast.error('Please sign in to renew');
-                        return;
-                      }
-
-                      try {
-                        toast.loading('Redirecting to checkout...');
-                        const { data, error } = await supabase.functions.invoke('create-checkout', {
-                          body: JSON.stringify({ driverId: user.id })
-                        });
-
-                        toast.dismiss();
-
-                        if (error) {
-                          console.error('Checkout function error:', error);
-                          toast.error('Unable to create checkout session. Please contact support.');
-                          return;
-                        }
-
-                        // Expecting the function to return a URL to redirect the user to
-                        const checkoutUrl = data?.url || data?.checkout_url || null;
-                        if (checkoutUrl) {
-                          window.location.href = checkoutUrl;
-                        } else {
-                          toast.info('💳 Contact support at: support@uber-tunisia.com to renew your subscription (50 TND/month)');
-                        }
-                      } catch (err) {
-                        console.error('Error creating checkout:', err);
-                        toast.error('Something went wrong creating the checkout session.');
-                      }
-                    }}
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Contact Support to Renew (50 TND/month)
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         <Separator />
 
