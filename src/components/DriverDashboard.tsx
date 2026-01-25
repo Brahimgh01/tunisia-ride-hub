@@ -139,7 +139,6 @@ export default function DriverDashboard() {
 
             // Only consider registered if all required fields are present
             const requiredFields = [
-              'vehicle_type',
               'vehicle_model',
               'vehicle_color',
               'license_plate_number',
@@ -386,7 +385,10 @@ export default function DriverDashboard() {
   }
 
   if (!isRegistered) {
-    return <DriverRegistration onRegistrationComplete={() => setIsRegistered(true)} />;
+    return <DriverRegistration onRegistrationComplete={() => {
+      setIsRegistered(true);
+      setIsVerified(true); // Auto-verified after registration
+    }} />;
   }
 
   return (
